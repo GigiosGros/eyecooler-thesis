@@ -8,6 +8,7 @@ with the analysis code and the figures it uses.
 | `thesis/` | The dissertation (PDF) |
 | `figures/` | The figures of the dissertation made by the author (figures reproduced from other publications are not included) |
 | `code/ch2-exvivo-analysis/` | Chapter 2: thermistor processing, quality control, endpoints, uncertainty and statistics of the ex-vivo cooling experiments on human and porcine eyes (`run_analysis.py`; tests in `tests/`) |
+| `code/ch2-ct-segmentation/` | Chapter 2: segmentation of the micro-CT scans of the eyes and of the pig MRI, globe outline and axis, and the position of each thermistor in the eye (`run.py`; scans listed in `config.json`) |
 | `code/ch2-bath-vs-perfusion/` | Chapter 2: conduction estimate of the heated oil bath used in place of perfusion |
 | `code/ch3-model-analysis/` | Chapter 3: analysis of the COMSOL model exports (`run_analysis.py`; tests in `tests/`) |
 | `code/ch3-heat-replica/` | Chapter 3: finite-element heat-transfer program that re-solves the COMSOL models from the model files (`replica/`, `run_all.py`, `run_waterblock.py`, and `dev/new_runs.py` for the corrected and extended cases) |
