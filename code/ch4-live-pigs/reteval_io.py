@@ -30,6 +30,7 @@ Also holds erg_folder(), which finds a session's ERG folder whatever number
 prefix it carries ("06 - ERG Recording" in the cooling sessions, "05 - ..." in
 the End-of-Life one).
 """
+import time
 import csv
 import datetime
 import re
@@ -150,8 +151,24 @@ def phase_files(erg: Path, phase: str, sub: str, session=None):
     if is_eol(session if session is not None else erg.parent):
         if phase != "Pre":
             return []
-        return sorted(f for f in erg.glob("*" + EOL_SUFFIX) if not f.name.startswith("~$"))
-    return sorted(f for f in (erg / sub).glob("*.xlsx") if not f.name.startswith("~$"))
+        return sorted(f for f in listing(erg, "*" + EOL_SUFFIX) if not f.name.startswith("~$"))
+    return sorted(f for f in listing(erg / sub, "*.xlsx") if not f.name.startswith("~$"))
+
+
+def listing(folder: Path, pattern: str, tries: int = 4, wait_s: float = 1.5):
+    """folder.glob(pattern), asked again when it comes back empty for a folder that exists.
+    Box Drive can return an empty listing for a folder it hasn't finished listing; without
+    this a phase was skipped with no message (2026-11-05). Still empty after the retries:
+    printed as a warning when the folder isn't empty, so a skip is never silent."""
+    folder = Path(folder)
+    for i in range(tries):
+        found = list(folder.glob(pattern))
+        if found or not folder.is_dir():
+            return found
+        time.sleep(wait_s)
+    if any(folder.iterdir()):
+        print(f"  ! WARNING: no {pattern} in {folder} after {tries} tries, but the folder is not empty")
+    return found
 
 
 def erg_folder(session_folder: Path):
@@ -161,7 +178,9 @@ def erg_folder(session_folder: Path):
     session_folder = Path(session_folder)
     if not session_folder.is_dir():
         return None
-    for d in sorted(session_folder.iterdir()):
-        if d.is_dir() and "erg" in d.name.lower():
-            return d
+    for _ in range(4):
+        for d in sorted(session_folder.iterdir()):
+            if d.is_dir() and "erg" in d.name.lower():
+                return d
+        time.sleep(1.5)                 # Box Drive: listing not ready yet (see listing())
     return None

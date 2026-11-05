@@ -30,7 +30,8 @@ Definitions used for the summary (all times from the effective events):
   wait_min        switch-on minus placement on the eye
   cooling_min     switch-off minus switch-on
   removal_min     removal minus switch-off
-  ring_before_C   mean ring temperature over the 60 s before switch-on
+  ring_before_C   mean ring temperature over the 30 s before switch-on (ring on the eye, settled)
+  ring_placement_C  mean ring temperature over the 30 s before placement on the eye (ring at room)
   reach_4p5_min   first time after switch-on with the ring at or below 4.5 C (blank if never)
   regulation_min  "Regulation Start" of the tools (relay/switch begins cycling) minus switch-on
   reach_hold_plus0p5_min  first time after switch-on within 0.5 C of the session's own
@@ -209,8 +210,10 @@ def summary(ring):
                "cooling_min": (off - on) / 60,
                "removal_min": (removed - off) / 60 if removed is not None else np.nan,
                "restarts_n": len(rs)}
-        pre = (t >= on - 60) & (t < on)
+        pre = (t >= on - 30) & (t < on)          # 2026-11-05: last 30 s, so no settling is included
         row["ring_before_C"] = np.nanmean(T[pre]) if pre.any() else np.nan
+        pre = (t >= placed - 30) & (t < placed) if placed is not None else np.zeros_like(t, bool)
+        row["ring_placement_C"] = np.nanmean(T[pre]) if pre.any() else np.nan
         cool = (t >= on) & (t <= off)
         hit = np.where(cool & (T <= REACH_C))[0]
         row["reach_4p5_min"] = (t[hit[0]] - on) / 60 if len(hit) else np.nan
