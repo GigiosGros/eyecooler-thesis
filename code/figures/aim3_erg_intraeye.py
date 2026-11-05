@@ -119,9 +119,17 @@ def effects_table(d, iop, summ):
             s = stat(g[g.Duration_min == dur][col])
             cs.append(f"{sg(s['mean'])} ({sg(s['lo'])}, {sg(s['hi'])})")
         L.append(f"{'Intraocular pressure (mmHg)' if k == 0 else ''} & {dur} & " + " & ".join(cs) + " & & \\\\")
-    L += ["\\hline", "\\multicolumn{7}{l}{\\emph{Ring about 4~$^\\circ$C, one session each}} \\\\"]
+    # 2026-11-05: durations and session counts of the 4 C group from the data (was 30 and 60 min, "one session each",
+    # before animals 5 and 6 had their 120-min sessions)
+    q4 = d[(d.set == "ring 4") & (d.comparison == "cooling") & (d.flash == 25.0) & (d.measure == "b_t")
+           & (d.unit == "abs") & (d.who == "TvT")]
+    n4 = {dur: int(q4[q4.duration == str(dur)].n.iloc[0]) for dur in (30, 60, 120) if (q4.duration == str(dur)).any()}
+    words = {1: "one", 2: "two", 3: "three", 4: "four"}
+    lo, hi = min(n4.values()), max(n4.values())
+    nsess = f"{words[lo]} session{'s' if lo > 1 else ''} each" if lo == hi else f"{words[lo]} or {words[hi]} sessions at each duration"
+    L += ["\\hline", f"\\multicolumn{{7}}{{l}}{{\\emph{{Ring about 4~$^\\circ$C, {nsess}}}}} \\\\"]
     for m, lab in names:
-        for k, dur in enumerate((30, 60)):
+        for k, dur in enumerate(n4):
             L.append(f"{lab if k == 0 else ''} & {dur} & " + " & ".join(cell(d, "ring 4", "cooling", 25.0, m, dur, w) for w in ("TvT", "CvC", "TvT-CvC")) + " & & \\\\")
     L += ["\\hline", "\\end{tabular}"]
     return "\n".join(L) + "\n"
