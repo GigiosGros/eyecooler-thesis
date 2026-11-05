@@ -1,0 +1,25 @@
+# Depth (mm) of the vitreous sensor below the outer surface of the globe, from the micro-CT segmentation.
+# depth_convex_hull_mm is the one used by the gate (qc.vitreous_min_depth_mm): distance from the sensor pick to the convex hull
+# of the segmented globe. Source: micro-CT segmentation, 2026-10-03.
+# E8: point labelled H8-2 (the vitreous sensor; markers.key_by = "label"), relabelled. The earlier 0.64 / 0.51 / -0.48
+# belonged to the point labelled H8-3 (anterior sclera). All three recomputed 2026-10-03.
+species,status,marker_eye,depth_convex_hull_mm,depth_envelope_tracks_sealed_mm,depth_tissue_boundary_mm
+Human,Fresh,E1,3.31,2.09,0.16
+Human,Fresh,E2,2.06,0.65,-0.29
+Human,Fresh,E3,7.71,7.55,6.79
+Human,Fresh,E4,7.84,6.88,6.19
+Human,Fresh,E5,1.89,0.54,-0.31
+Human,Fresh,E6,5.84,4.58,3.9
+Human,Fresh,E7,7.51,6.96,6.96
+Human,Fresh,E8,1.83,1.4,1.4
+Human,Fresh,E9,7.02,6.24,5.76
+Porcine,Fresh,E15,7.56,6.85,6.09
+Porcine,Fresh,E16,6.71,5.97,5.0
+Porcine,Fresh,E17,3.97,2.43,-0.12
+Porcine,Fresh,E18,4.35,1.4,-0.5
+Porcine,Fresh,E19,5.78,4.09,2.99
+Porcine,Preserved,E11,3.55,3.26,3.21
+Porcine,Preserved,E12,9.66,9.3,9.26
+Porcine,Preserved,E13,6.5,3.62,3.62
+Porcine,Preserved,E14,8.53,6.61,6.61
+Porcine,Preserved,E15,8.17,5.51,5.51

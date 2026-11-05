@@ -1,0 +1,25 @@
+# Position of the vitreous sensor between the centre of the globe outline and the wall, from the micro-CT segmentation.
+# centre_fraction is the one used by the gate (qc.vitreous_max_centre_fraction): distance of the sensor pick from the centre of the outline
+# divided by the radius of the outline in the same direction (0 = centre, 1 = on the wall).
+# Source: micro-CT segmentation, globe outlines of 2026-10-07 (with manual corrections).
+# Copied 2026-10-07. Refresh after the outlines change.
+species,status,marker_eye,centre_fraction,distance_from_centre_mm,wall_radius_same_direction_mm,depth_below_outline_mm,eye,outline
+Human,Fresh,E1,0.694,8.23,11.87,3.62,H1,smooth_star
+Human,Fresh,E2,0.742,9.01,12.14,3.13,H2,smooth_star
+Human,Fresh,E3,0.382,4.68,12.26,7.55,H3,smooth_star
+Human,Fresh,E4,0.378,4.71,12.45,7.73,H4,smooth_star
+Human,Fresh,E5,0.82,10.24,12.49,2.27,H5,smooth_star
+Human,Fresh,E6,0.51,6.32,12.4,5.23,H6,smooth_star
+Human,Fresh,E7,0.461,6.0,13.01,6.96,H7,smooth_star
+Human,Fresh,E8,0.807,11.42,14.15,2.77,H8,smooth_star
+Human,Fresh,E9,0.449,5.57,12.39,6.37,H9,smooth_star
+Porcine,Fresh,E15,0.396,4.86,12.29,7.27,F15,smooth_star
+Porcine,Fresh,E16,0.402,4.88,12.12,6.71,F16,smooth_star
+Porcine,Fresh,E17,0.55,5.69,10.35,3.68,F17,smooth_star
+Porcine,Fresh,E18,0.686,7.62,11.12,3.41,F18,smooth_star
+Porcine,Fresh,E19,0.574,7.09,12.37,4.96,F19,smooth_star
+Porcine,Preserved,E11,0.656,6.41,9.77,3.28,P11,opening+marks
+Porcine,Preserved,E12,0.164,1.95,11.9,9.23,P12,opening+marks
+Porcine,Preserved,E13,0.599,5.78,9.66,3.62,P13,opening+marks
+Porcine,Preserved,E14,0.301,3.39,11.29,6.43,P14,opening+marks
+Porcine,Preserved,E15,0.442,4.46,10.08,4.5,P15,opening+marks
