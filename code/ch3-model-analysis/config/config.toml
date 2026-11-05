@@ -1,0 +1,133 @@
+# COMSOL model analysis (SCR + Waterblock) — every parameter of the method, in one place.
+# Values reproduce analysis notebook v3.8.0 (Model_Analysis_v3_8_0.ipynb, Steps 3a–3e),
+# except where a [corrections] switch below is on (tests/test_reproduce.py turns them all off).
+
+[units]
+k_to_c = 273.15
+max_time_min = 35.0            # every time-indexed signal is cut at this time (t = 35 row kept)
+
+[vocabulary]
+variants = ["V1", "V2", "V3"]
+interfaces = ["Eye", "Eyelids", "Air"]
+silicones = ["Baseline", "0.5 mm", "1.0 mm"]
+materials = { 1 = "Aluminum", 2 = "Ceramic", 3 = "Glass" }   # COMSOL material-switch index
+
+[probes]
+scr_point = ["Optic Nerve Head", "Vitreous Humor", "Anterior Sclera", "Posterior Sclera",
+             "Equatorial Sclera", "Optic Nerve", "SCR"]
+retina_agg = ["Retina Avg", "Retina Max", "Retina Min"]
+eye_agg = ["Eye Avg", "Eye Max", "Eye Min"]
+waterblock = ["TEC", "INw", "OUTw", "Waterblock"]
+# the six sites shared with the ex-vivo experiment (Step 13 "main sensors")
+main = ["SCR", "Equatorial Sclera", "Vitreous Humor", "Optic Nerve Head", "Anterior Sclera", "Posterior Sclera"]
+
+[thresholds]
+safety_hot_C = 43.0            # IEC 60601-1 applied-part limit (>10 min contact)
+safety_cold_C = 4.0
+therapeutic_C = 35.0           # upper edge of the therapeutic window (THERAPEUTIC_EDGE_C)
+therapeutic_moderate_C = 32.0  # carried for reference; not used by any metric (as in the notebook)
+
+[metrics]
+equilibrium_rate_K_per_min = 0.05   # |dT/dt| below this ...
+equilibrium_window_min = 2.0        # ... for this long
+equilibrium_min_change_fraction = 0.9   # ... and only after this fraction of the total change (corrections.equilibrium_after_change)
+fit_T_bounds_C = [-10.0, 60.0]      # outer clamp for the exponential fit's T_inf / T_0
+fit_tau_bounds_min = [0.1, 1000.0]
+fit_skip_first_min = 0.0
+
+[mesh]
+gci_safety_factor = 1.25
+p_formal = 2.0                 # formal order of the (quadratic) elements; cap for the observed order
+scr_order = ["Coarser", "Coarse", "Normal"]      # coarse -> fine
+wb_order = ["Coarse", "Normal", "Fine"]
+divergent_min_change_C = 0.01   # a fine-step change below this is numerical noise, not divergence (corrections.gci_flag_divergent)
+# Operating point of the waterblock Coarse/Normal mesh exports (the Fine mesh is a sweep;
+# the matching Fine run is picked from it). T0 = 298.15 K is not on the Fine grid (283.15 / 308.15 K).
+wb_ref_point = { Q0 = 4.2e-6, Tin_K = 293.15, T0_K = 298.15, Qh = 22000.0 }
+
+[mesh.dof_scr]
+V1 = { Coarser = 16873, Coarse = 39952, Normal = 179228 }
+V2 = { Coarser = 16047, Coarse = 38494, Normal = 176051 }
+V3 = { Coarser = 16175, Coarse = 39063, Normal = 185132 }
+
+[mesh.dof_wb]
+V1 = { Coarse = 14153, Normal = 35977, Fine = 101447 }
+V2 = { Coarse = 21989, Normal = 54051, Fine = 109253 }
+V3 = { Coarse = 15565, Normal = 35654, Fine = 86451 }
+
+[geometry]
+half_model_factor = 2.0        # SCR study is a half-symmetry model: x2 on SCR/eye energies and on q_TEC (after the interior-face factor)
+tec_area_m2 = 0.00037951
+scr_characteristic_L_m = 0.008 # GUESS (not surveyed) — feeds Bi / Fo only
+v1_path_split = { Q_A_frac = 0.618, Q_B_frac = 0.382 }
+scr_baseline_point = { T0_K = 298.15, Tb_K = 310.15, Tc_K = 277.15 }   # parametric run = mesh-study operating point
+
+[geometry.interface_areas_m2]   # full physical contact areas, used only for the Step 8 area cross-check
+Eye = { V1 = 0.000379346, V2 = 0.000392709, V3 = 0.000619269 }
+Eyelids = { V1 = 0.000973423, V2 = 0.000899060, V3 = 0.000899060 }
+Air = { V1 = 0.000298814, V2 = 0.000199583, V3 = 0.000309523 }
+
+[geometry.waterblock]          # mm; Reynolds report Table 2
+V1 = { R_i = 8.00, R_o = 13.00, w = 5.00, H_ch = 6.00, H_fin = 3.00, N_fins = 7, t_fin = 2.00, L_fin = 2.54, D_in = 4.00, L_pipe = 15, tip_gap = true }
+V2 = { R_i = 8.00, R_o = 13.00, w = 5.00, H_ch = 3.50, H_fin = 3.50, N_fins = 18, t_fin = 1.00, L_fin = 2.51, D_in = 2.25, L_pipe = 10, tip_gap = false }
+V3 = { R_i = 7.75, R_o = 12.26, w = 4.51, H_ch = 2.00, H_fin = 2.00, N_fins = 21, t_fin = 0.50, L_fin = 2.27, D_in = 1.41, L_pipe = 5, tip_gap = false }
+
+[tissue]
+k = 0.60                       # W/m K
+rho = 1050.0                   # kg/m^3
+cp = 3700.0                    # J/kg K
+
+[water]                        # interpolated linearly in temperature (clamped at the ends)
+T_C = [4.0, 10.0, 25.0]
+nu = [1.567e-6, 1.307e-6, 0.893e-6]
+rho = [1000.0, 999.7, 997.0]
+k = [0.5707, 0.5861, 0.6071]
+cp = [4204.0, 4192.0, 4180.0]
+fallback_T_C = 10.0            # used when a run has no inlet temperature
+
+[flow]
+reynolds_nominal_Q_m3s = 8.0e-6   # the Reynolds-report reference flow (not a sweep point)
+reynolds_nominal_Tin_C = 25.0
+
+[exvivo]
+# Model-vs-experiment comparison (different conditions; see comsol_analysis/exvivo.py).
+summary_csv = "../thesis-analysis/results/02_groups/all_groups_summary.csv"   # relative to this package
+reference_C = 37.0                      # body temperature (model Tb) = ex-vivo bath temperature, 37 °C
+ring_to_variant = { Original = "V1", "Reduced Bulk" = "V2" }   # V1 original, V2 reduced bulk, V3 reduced bulk + corneal lens (no ex-vivo data)
+material_comparison_csv = "../thesis-analysis/results/03_comparisons/Human__aluminum_original__vs__Human__ceramic_original/channels.csv"
+species = ["Human"]                     # the model is human geometry; porcine eyes are not compared
+
+[superposition]
+# Rescaling of the SCR runs to another ring start (comsol_analysis/rescale.py). The runs start from a stationary
+# solution with the ring held at T0; the model is linear, so they can be rescaled exactly to an eye that starts at
+# body temperature, or to the ex-vivo ring start. Derived, not simulated: OFF until confirmed by the corrected
+# COMSOL run (stationary study without T = T0 on the TEC).
+enabled = false
+min_ring_step_K = 5.0           # runs with |T0 - Tc| below this are not rescaled (step too small)
+exvivo_window_min = [16, 20]    # experimental final window (thesis-analysis qc.final_window_s = 240 s of a 20-min run)
+
+[resistance]
+steady_fraction = 0.20         # SCR R_steady = mean of the last 20 % of samples
+
+[corrections]
+# Each switch fixes one defect found when checking notebook v3.8.0 (see README).
+# false = the notebook's behaviour.
+therapeutic_nan_if_start_beyond = true   # t->35 C is NaN (+ flag) for a trace that STARTS past 35 C; notebook reports 0
+therapeutic_direction_step13 = true      # Step-13 summary crosses 35 C in the trace's own direction (as Step 12 does)
+equilibrium_after_change = true          # a flat start (site still waiting for the cold) is not equilibrium: t_eq is searched only after
+                                         # 90 % of the total change; the notebook returns t_eq = 0 for every lagged site
+equilibrium_full_window = true           # t_eq needs a complete 2-min window inside the trace (no effect on current data)
+dittus_boelter_heating = true            # coolant is HEATED by the TEC hot side -> n = 0.4; notebook uses n = 0.3
+interface_flux_interior_double = false   # WITHDRAWN 2026-10-07. The exported interface heat rates are single-sided half-model values:
+                                         # they equal COMSOL's stored boundary fluxes integrated over the half model (v1 at 35 min:
+                                         # eyelids 1.232, eye 0.458, air 0.041 W). There is no double counting to remove.
+use_stored_flux_energies = true          # ring energy tables read from Model_data/stored_flux_energies/ (complete; from COMSOL's stored
+                                         # boundary fluxes) instead of the exports of the same name, 4 of 9 of which miss faces. See the README there.
+tec_flux_interior_average = true         # The TEC cold face is an INTERIOR boundary (ring / inert TEC layer). COMSOL's exported q_TEC is
+                                         # the mean of its two sides, one of which carries no heat, i.e. HALF the heat through the face
+                                         # (stored flux, half model: 1.7315 W; exported: 0.8658 W). q_TEC is doubled before use.
+wb_fine_interpolate_T0 = true            # Fine-mesh GCI point interpolated to T0 = 298.15 K; notebook takes the nearest run (308.15 K)
+gci_cap_p_formal = true                  # observed order p > formal order -> use p_formal in the GCI band (conservative; Roache)
+gci_flag_divergent = true                # change between the two finest meshes larger than between the two coarsest -> status
+                                         # DIVERGING and band = spread of the three meshes (the notebook gives it a GCI and a status)
+gci_oscillatory_spread = true          # oscillatory convergence (GCI undefined) -> band = spread of the three meshes

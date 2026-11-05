@@ -1,0 +1,320 @@
+# SCEC ex-vivo thermal analysis — every parameter of the method, in one place.
+# The values reproduce analysis notebook v4.28 (Eye_Experiment_Analysis_v4_28.ipynb).
+
+[channels]
+# Display order, anterior -> posterior. SCR is the device (ring) probe; the other
+# five are tissue sites.
+temperature = ["SCR", "Anterior Sclera", "Equatorial Sclera", "Vitreous",
+               "Posterior Sclera", "Optic Nerve"]
+device = ["SCR"]
+current = "Current"
+primary_endpoint = "Optic Nerve"
+
+[acquisition]
+# Column layout of the human .xlsx files (position j = column j).
+human_columns = ["Relative Time", "Date", "Time Stamp", "SCR", "Equatorial Sclera",
+                 "Vitreous", "Optic Nerve", "Anterior Sclera", "Posterior Sclera",
+                 "Current"]
+expected_dt_s = 0.1
+
+# Sensors plugged into each other's amplifier channel. The recording is converted with the curve of the
+# channel it was acquired on and then renamed to the sensor it is.
+[[acquisition.channel_swaps]]
+species = "Human"
+eye = 4
+channels = ["Equatorial Sclera", "Anterior Sclera"]
+reason = """2026-10-03. In eye 4 the channel recorded as equatorial sclera is the anterior-sclera sensor, and the \
+sensor that failed (lab note 'Ch5 FAILED') is the equatorial one. Evidence: (1) in the pre-run equilibrium recordings \
+(Eq_E4_*.xlsx) the 'equatorial' channel follows the ring to within 0.5 V in all three recordings, as the anterior channel \
+does in every other eye, while the 'anterior' channel, for the ~140 s before it failed, sat about 3 V warmer than the \
+ring, as the equatorial channel does in every other eye; (2) the 'equatorial' channel starts each run at about -5.4 V \
+(other eyes: equatorial -6.5 to -7.0 V, anterior -4.9 to -5.9 V) and cools 26 C (other eyes: equatorial 7-16 C); \
+(3) the micro-CT shows the equatorial sensor at its usual position (1.2 mm from the cohort mean)."""
+
+# Workbook columns exchanged by hand after acquisition (the acquisition files keep the amplifier order).
+# Each column is converted with the curve of the amplifier channel it was acquired on; nothing is renamed.
+[[acquisition.column_exchanges]]
+species = "Human"
+eye = 6
+channels = ["Anterior Sclera", "Posterior Sclera"]
+reason = """2026-10-05. In all six eye-6 workbooks (Ex_E6_A/C/LB, Eq_E6_A/C/LB) the anterior- and posterior-sclera \
+columns are exchanged relative to the WinDaq acquisition files (.WDH channels 5 and 6); every other human workbook is in \
+acquisition order. The exchanged order is the physical one: the 'anterior' column follows the ring in the equilibrium \
+recordings (0.5-1.2 V from it) and cools by 8.6-11.6 V, the 'posterior' column sits 1.8-3.0 V from the ring and cools by \
+2.7-4.7 V, as in the other eyes. The two sensors were therefore on each other's amplifier channel, and each column must \
+be converted with the other column's curve. Effect: at most 0.4 C on the six eye-6 traces, 0.05 C on a group mean."""
+
+[calibration]
+reference_temps_C = [37.0, 20.5, 4.0]     # dry-block plateaus of the human calibration sessions
+human_curve = "linear"                    # 2026-10-03: least-squares line through the three plateaus, per session and
+                                          # channel (same kind of conversion as the porcine eyes). "steinhart_hart" =
+                                          # notebook v4.28 (reads up to 2 degC high between 37 and 20.5 degC)
+current_reference_A = [3.9, 0.0]          # human current calibration plateaus
+porcine_slope = -2.0656                   # porcine V -> degC, fixed for all channels
+porcine_intercept = 20.4390
+clip_C = [0.0, 43.0]                      # post-calibration sanity range (2026-10-07: 45 -> 43, as the device
+                                          # over-temperature limit; no reading lies between, all 40 result tables identical)
+kmeans_seed = 42
+plateau_method = "settled"                # 2026-11-04: plateau = median of the last 3 min before the ramp (last
+                                          # 10 s dropped), stable band (10-s medians within +-0.01 V) if those 3 min
+                                          # drift > 5 mV/min; a plateau under 3 min (37 C of HE1-HE4, settled > 7 min
+                                          # before recording) = median of the whole recorded plateau. Same rule as
+                                          # the in-vivo ring calibration. "kmeans" = notebook v4.28.
+
+[filter]
+median_kernel = 51                        # samples (5.1 s at 10 Hz); edge padded with the edge value
+lowpass_cutoff_Hz = 0.01                  # zero-phase Butterworth
+lowpass_order = 2
+onset_reflection_s = 300                  # point-reflected extension before the cooling onset
+
+[qc]
+hardware_min_samples = 100
+hardware_flat_std_V = 1e-4                # flat-lined channel
+hardware_stuck_fraction = 0.9             # fraction of samples at the median value
+hardware_railed_V = 9.9                   # 2026-10-03: |V| above this = amplifier rail (+/-10 V). A trace railed for more than
+hardware_railed_fraction = 0.75           # this fraction of the run is a hardware failure. Catches H_Fresh_E4_A anterior sclera
+                                          # (39 % at -10 V, then 49 % at +10 V: never "stuck at the median"). Next highest: 0.93;
+                                          # every included trace: 0. Remove both keys for the notebook v4.28 gate
+fit_r2_min = 0.85                         # single-exponential quality gate
+fit_min_samples = 20
+tukey_k = 1.5                             # report-only temperature fence (and the legacy spatial fences)
+fence_min_n = 4
+spatial_fence = "aligned_mm"              # 2026-10-02: each eye's constellation rigidly aligned to the cohort mean,
+                                          # sensor flagged when its aligned distance from the mean position exceeds the
+                                          # fence below. Legacy Tukey on the inter-sensor-distance deviation:
+                                          # "upper" (Q3 + k*IQR only) or "two-sided" (reproduces notebook v4.28)
+thermistor_length_mm = 3.3                # sensing tip, 3.3 mm MAX (TE GA10K3MCD1 datasheet, no +/- tolerance): unit of the spatial fence
+spatial_fence_lengths = 1.0               # fence = 1 thermistor length (3.3 mm) ...
+spatial_fence_lengths_by_channel = { Vitreous = 2.0 }   # ... except vitreous, 2 lengths (6.6 mm): not fixed to tissue
+spatial_free_channels = ["Vitreous"]      # 2026-10-03: sensors not fixed to tissue. They do not shape the rigid alignment and have
+                                          # no offset fence (the vitreous sensor is screened by vitreous_max_centre_fraction below); [] restores
+                                          # the 5-sensor alignment with the 2-length vitreous fence
+spatial_guard_band_mm = 0.0               # 2026-10-03: no guard band; the limit is the thermistor length, 3.3 mm. A 0.3 mm band was
+                                          # added earlier the same day to release near misses (3.39, 3.48 mm) that turned out to be
+                                          # produced by the mis-keyed H8 marker and the 5-sensor alignment; with the label reading and
+                                          # the 4-sensor alignment the largest offset in any cohort is 2.14 mm, so it decides nothing.
+                                          # (Offsets from automatically detected bead centroids differ from those of the manual picks
+                                          # by 0.07 mm median, 0.21 mm 95th percentile, 0.36 mm max.)
+vitreous_max_centre_fraction = 0.75       # 2026-10-07: the vitreous sensor must lie in the vitreous cavity. Flagged when its micro-CT
+                                          # position is more than this fraction of the way from the centre of the globe outline to the
+                                          # wall in the same direction (0 = centre, 1 = on the wall). The measure scales with eye size.
+                                          # Human eyes 5 and 8 are at 0.82 and 0.81 and are flagged; the next sensor, human eye 2, is at
+                                          # 0.74, only 0.01 inside the limit (any limit from 0.75 to 0.80 flags the same two).
+                                          # 0 switches the rule off.
+vitreous_position_file = "vitreous_position_ct.csv"   # in config/; from the micro-CT segmentation
+                                          # (outlines of 2026-10-06, with the hand-drawn corrections)
+vitreous_min_depth_mm = 0.0               # superseded 2026-10-07 (was 2.0, 2026-10-03): flagged when less than this far inside the
+                                          # convex hull of the segmented globe. On the corrected outlines eyes 5 and 8 are 2.3 and
+                                          # 2.8 mm deep, so the 2 mm limit no longer separated them; a fixed depth also ignores eye size.
+vitreous_depth_file = "vitreous_depth_ct.csv"   # in config/; depths from the EARLIER outlines (2026-10-03), kept for the record
+final_window_s = 240                      # T_final = mean of minutes 16-20 (after every t90; max 940 s).
+                                          # Notebook v4.28 used 15 s: ripple then depended on the end point.
+plateau_window = "final"                  # plateau SD over the same final window ("t90" = notebook v4.28)
+spatial_precedence = true                 # a spatial breach outranks an earlier Broken reason
+apply_manual = true                       # apply [[qc.manual_exclusions]] (false = notebook v4.28)
+
+# Kept, with a note (2026-10-03): run H_Fresh_E6_A, the third run on eye 6, started below thermal equilibrium
+# (posterior sclera 29.6 C against 33.3 and 32.1 C in that eye's first two runs; ring 27.1 against 28.5 C). Its optic-nerve
+# and vitreous traces are excluded on other grounds; anterior, equatorial and posterior sclera stay in the analysis.
+
+# Sensors documented as failing although the run itself passes the voltage test. Counted as hardware.
+[[qc.hardware_exclusions]]
+run_id = "H_Fresh_E9_A"
+channel = "Anterior Sclera"
+figure_note = "Sensor failing: at the input\nlimit before the run, no\nsignal in the later runs"
+reason = """2026-10-05. The sensor was failing. In the equilibrium recording before this run (Eq_E9_A) it drifts \
+away from the ring from about 600 s and sits at the -10 V input limit from 905 s (626 samples); it starts the run at \
+-6.95 V (34.7 C), where the anterior sensor of every other eye starts at -4.5 to -5.9 V; and it is dead (+10 V) in the \
+two later runs on this eye (Ex_E9_C, Ex_E9_LB). Effect of excluding it: human anterior sclera n 9 -> 8, initial \
+31.4 -> 30.9 C, final 9.8 -> 9.1 C, excursion 21.6 -> 21.8 C; no other site changes."""
+
+# Manual exclusions: traces with an obvious transient artifact that pass the
+# objective gates. Applied after them; each entry states its justification.
+[[qc.manual_exclusions]]
+run_id = "P_Preserved_E3_A"
+channel = "Anterior Sclera"
+reason = """Trace shape: a step near 2.5 min, then re-warming near 16 min and an uneven, non-smooth fall, unlike the other preserved eyes. Identified on visual inspection and excluded in the original 2023 analysis ('Average without broken channels' sheet, Analysis preserved 11-15 YN.xlsx). Decision 2026-09-30, confirmed 2026-10-03. Sensitivity (to be reported): with the trace included, preserved anterior dT is 24.1 (SD 2.0, n = 5) instead of 24.9 (0.9, n = 4), and human original-ring minus preserved goes from -3.66 C (Holm p 0.032) to -2.82 C (Holm p 0.23); no other comparison changes its verdict."""
+
+[[qc.manual_exclusions]]
+run_id = "H_Fresh_E4_A"
+channel = "Vitreous"
+reason = """Regular oscillation of 3-4 C (period ~3 min) from minute 6 to the end while the SCR held \
+4 C; the same sensor oscillates in the reduced-bulk run and is smooth in the ceramic run, so the \
+artifact belongs to the run, not the tissue. Visual inspection, 2026-09-30."""
+
+[[qc.manual_exclusions]]
+run_id = "H_Fresh_E4_LB"
+channel = "Vitreous"
+reason = """Same oscillation artifact as the original-ring run of this eye (3-4 C, ~3 min period). \
+Visual inspection, 2026-09-30."""
+
+[[qc.manual_exclusions]]
+run_id = "H_Fresh_E6_A"
+channel = "Vitreous"
+reason = """Cools to ~21 C, then re-warms by ~2 C over the last 10 min while the SCR held 4 C: drift, \
+not a cooling plateau. Visual inspection, 2026-09-30."""
+
+[markers]
+key_by = "label"                          # 2026-10-03: the sensor number is the label given to the point in Slicer
+                                          # (H8-3 -> 3). "id" = Slicer's internal control-point id (notebook v4.28); they
+                                          # differ only in H8.mrk.json, where ids 2 and 3 carry the labels H8-3 and H8-2
+
+[markers.ids]
+# Sensor number -> channel (5-point files H*, F*, P*).
+"1" = "Equatorial Sclera"
+"2" = "Vitreous"
+"3" = "Anterior Sclera"
+"4" = "Posterior Sclera"
+"5" = "Optic Nerve"
+
+[statistics]
+mixed_model = false                       # 2026-10-03: the per-site tests are the analysis. true adds the notebook v4.28 mixed
+                                          # model (dT ~ group x site), which pools one residual variance over sites whose
+                                          # between-eye SD differs up to ten-fold
+alpha = 0.05
+equivalence_margin_C = 2.0                # fixed in notebook v4.25, after data collection
+
+[statistics.donor_of_human_eye]
+# Human fellow eyes -> donor (random intercept in the mixed model).
+"1" = "HD1"
+"2" = "HD1"
+"3" = "HD2"
+"4" = "HD2"
+"5" = "HD3"
+"6" = "HD3"
+"7" = "HD4"
+"8" = "HD4"
+"9" = "HD5"
+
+[figures]
+temperature_ylim_C = [0, 40]              # same scale on every group and comparison figure
+group_linestyles = ["-", "--", ":", "-."] # group figures and comparisons: line style = group
+width_in = 6.0                            # drawn at printed size: thesis text width (8.5 in - 1.5 - 1.0)
+font_pt = 12                              # = thesis body text (12 pt); tick labels 1 pt smaller
+
+[figures.display_names]                   # names shown in titles and legends (folders keep the internal name)
+"Human, aluminum original" = "Human, SCEC Gen 3"
+"Porcine fresh, aluminum original" = "Fresh porcine, SCEC Gen 3"
+"Porcine preserved, aluminum original" = "Preserved porcine, SCEC Gen 3"
+"Human, aluminum reduced-bulk" = "Human, reduced-bulk aluminum ring"
+"Human, ceramic original" = "Human, ceramic ring"
+
+[figures.channel_display_names]           # site names shown in figures = thesis text (Ch. 2)
+"SCR" = "SCR"
+"Anterior Sclera" = "Anterior sclera"
+"Equatorial Sclera" = "Equatorial sclera"
+"Vitreous" = "Vitreous"
+"Posterior Sclera" = "Posterior sclera"
+"Optic Nerve" = "Proximal optic nerve"
+
+[figures.channel_colors]                  # group figures and comparisons: colour = channel
+"SCR" = "#1f77b4"
+"Anterior Sclera" = "#9467bd"
+"Equatorial Sclera" = "#ff7f0e"
+"Vitreous" = "#2ca02c"
+"Posterior Sclera" = "#8c564b"
+"Optic Nerve" = "#d62728"
+
+[auxiliary]
+pressure_median_kernel = 11
+pressure_cutoff_Hz = 0.05
+current_median_kernel = 51
+current_cutoff_Hz = 0.10
+
+# ── Measurement-uncertainty budget (GUM), see Appendix E ─────────────────────
+[uncertainty]
+method = "measured"                       # 2026-10-03: budget from measured quantities (below). "notebook" = the v4.28 budget,
+                                          # whose sensitivities come from a circuit model that does not reproduce the calibration data
+# --- measured budget -------------------------------------------------------------------------------------------------
+slope_C_per_V = 2.06                      # calibration slope between the 37 and 20.5 C plateaus (16.5 C / 8 V), all channels
+plateau_window_V = 0.05                   # samples within this of a plateau level are settled (the notebook used 1 V: ramps)
+well_uniformity_C = 0.2                   # Fluke 9102S well-to-well uniformity (custom aluminum insert, away from the control sensor).
+                                          # TO CHECK against the 9102S datasheet (accuracy 0.25 and stability 0.05 are the two below)
+drift_after_calibration_V = 0.05          # largest change of the 20.5 and 37 C readings between calibration and the end of an
+                                          # experiment / day, May 2022 (Bench Data & Working Notes/Drift of Vout_20220427.xlsx)
+sensor_lead_ohm = 9.38                    # lead resistance in series with the thermistor (was hard-coded in the notebook budget)
+linear_interpolation_error_C = 0.34       # largest error of a straight line, 2-39 C, on the 11-temperature bench table of 2022-05-26
+linear_interpolation_dT_small_C = 0.10    # ... change of that error between the start and end of a small excursion (35 -> 31 C)
+linear_interpolation_dT_large_C = 0.52    # ... and of a large one (largest minus smallest error between 4 and 37 C)
+linear_conversion = "human"               # 2026-10-19: the three linear-conversion half-widths are
+                                          # the larger of the bench values above and those of the HUMAN calibration lines,
+                                          # computed from the calibration files (uncertainty.human_line_terms): largest miss
+                                          # at a plateau 0.56 C; optic-nerve small excursion 0.24 C; ring-channel spread 0.53 C.
+                                          # "bench" = the 2022 bench values only (budget before 2026-10-19)
+bench_table_C = [39, 37, 33, 29, 25, 20.5, 16, 12, 8, 4, 2]   # 2022-05-26 bench table, Sheet2 (Bench Data & Working Notes/
+bench_table_V = [-8.891754, -8.005473, -6.177012, -4.254201, -2.279714, -0.006612,   # Thermistor calibration/Thermistor
+                 2.257589, 4.22526, 6.13032, 7.912903, 8.762614]                    # Calibration_FINAL_20220526.xlsx), column "Mid"
+source_resistance_ohm = 10800             # resistance the thermistor sees, fitted from the calibration plateaus (median of 36
+                                          # channel-sessions, range 9.3-12.7 kOhm): sets how thermistor power varies with temperature
+selfheat_reference_C = 20.5               # temperature of the bench self-heating measurement (4.6 C mean rise in the calibration block with the linear conversion; 5.17 C with notebook v4.28's Steinhart-Hart)
+dT_small_C = [34.6, 30.8]                 # start and end temperature of a small excursion (human optic nerve, original ring)
+dT_large_C = [29.7, 4.05]                 # ... and of a large one (ring)
+# bath_stability_C (below, 0.2): the oil-bath scatter measured with a thermistor in the oil was 0.08 C (max 0.11) over 10 min in
+# 20 runs (Bench Data & Working Notes/TEC vs No TEC, ICE vs eTEC, Aug 2024); 0.2 is kept as a conservative value.
+# selfheat_residual_bound_C (below, 1.43): bath (37.1-37.5 C actual, lab notes) minus the highest tissue start temperature
+# (35.92 C with the linear conversion) = 1.2-1.6 C. The reading can only be low; no correction is applied (2026-10-03).
+# interchangeability_C (below, 0.2, datasheet): eight thermistors agreed within 0.01-0.09 C SD on the resistance table of 2021-10-08.
+# --- notebook budget, and values shared by both ----------------------------------------------------------------------
+well_accuracy_C = 0.25
+well_stability_C = 0.05
+daq_dc_accuracy_V = 0.005
+daq_fullscale_V = 20.0
+daq_bits = 16
+Vpos = 15.0
+Vneg = -15.0
+R_top_ohm = 7393
+R_parallel_ohm = 7550
+R_bottom_ohm = 5026
+opamp_gain = 5.91
+opamp_resistor_tol_pct = 1.0
+OpAmp_Vos_drift_uV_C = 0.3
+OpAmp_Ibias_max_A = 4e-9
+ambient_delta_C = 4.0
+wire_length_m = 0.5
+wire_gauge_awg = 22
+wire_material = "copper"
+R25_ohm = 10000
+beta_K = 3976
+beta_tol_pct = 0.5
+T_ref_C = 25.0
+dissipation_still_air_mW_per_C = 0.3
+dissipation_factor_in_medium = 5
+interchangeability_C = 0.2
+thermistor_tau_s = 0.2
+max_cooling_rate_C_per_s = 0.0687
+max_cooling_rate_measured_C_per_s = 0.54   # measured budget (2026-10-19): fastest -dT/dt of any included filtered
+                                          # trace, 1-s grid (a human ring trace; porcine ring mean curve 0.43). 0.0687 above = notebook budget
+interpolation_error_C = 0.37
+stem_conduction_C = 0.30                  # notebook budget only; not in the measured budget since 2026-10-08
+bath_stability_C = 0.2
+cal_temps_C = [4.0, 20.5, 37.0]
+noise_95CI_fallback_C = 0.46
+# Self-heating: measured on the bench at the +/-15 V rail (5 plateaus, 3 -> 15 V);
+# the residual entering the budget is bounded by the bath ceiling at the optic nerve.
+selfheat_dryblock_C = 5.17
+selfheat_bath_C = 37.0
+selfheat_baseline_ONH_C = 35.8
+selfheat_residual_bound_C = 1.43
+selfheat_dry_ONH_C = 5.66
+
+[sensitivity]
+# POST HOC sensitivity analyses of the species comparison at the primary endpoint
+# (added 2026-10-05; reported as such in thesis Sec. 2.3). Output:
+# results/03_comparisons/sensitivity_species_primary_endpoint.csv
+#   - leave one out: each included trace of either group removed in turn;
+#   - pooled comparator: the reference group against all listed groups together.
+# This section is not part of the tested snapshot and changes no other output.
+reference = "Human, aluminum original"
+comparator = "Porcine fresh, aluminum original"
+pooled_comparators = ["Porcine fresh, aluminum original", "Porcine preserved, aluminum original"]
+manual_exclusions_off = true               # 2026-10-19: re-run every comparison with the visually
+                                          # excluded traces retained -> 03_comparisons/sensitivity_manual_exclusions_off.csv
+
+[geometry_contrast]
+# POST HOC contrast (added 2026-10-06; thesis Sec. 3.3.3): the reduced-bulk ring against
+# the mean of the two rings of the original geometry in the same eye. Output:
+# results/03_comparisons/geometry_contrast.csv  (difference = mean(pooled) - target;
+# + in dT = the original geometry cooled more).
+# This section is not part of the tested snapshot and changes no other output.
+target = "Human, aluminum reduced-bulk"
+pooled = ["Human, aluminum original", "Human, ceramic original"]
