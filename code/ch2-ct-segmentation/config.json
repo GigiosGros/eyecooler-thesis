@@ -1,0 +1,248 @@
+{
+  "_comment": "Scan list for the ex-vivo micro-CT segmentation pipeline. Set 'box' to the folder holding the Ex-Vivo data (Human Eye/, Pig Eye/, the 3D Slicer markups) and 'ct' to an optional local copy of the CT slice stacks, used for speed when present (local_xdir). Paths may use {box} and {ct}. f = in-plane+slice downsampling factor for the working volume. bath: air | liquid. shell: true for collapsed/fixed eyes whose scleral shell must be closed before filling.",
+  "box": "<path to the Ex-Vivo data folder>",
+  "ct": "<optional local copy of the CT stacks>",
+  "cache_dir": "<cache folder>",
+  "out_dir": "{box}/CT Segmentation/outputs",
+  "picks_dir": "{box}/3D-Slicer_Markups-Thermistor Location reference on eye H9",
+  "pick_order": [
+    "equatorial",
+    "vitreous",
+    "anterior",
+    "posterior",
+    "optic"
+  ],
+  "params": {
+    "r_open_mm": 3.0,
+    "metal_n": 2.5,
+    "metal_n_low": 1.5,
+    "lens_dog_sigmas_mm": [
+      2.0,
+      5.0
+    ],
+    "thermistor_search_margin_mm": 3.0,
+    "label_lens_cornea": false,
+    "axis_optic_sensor_min_polar_deg": 110,
+    "axis_ring": {
+      "_comment": "Eye axis = normal of the holder ring plate (the eye always sits stump down through the ring, cornea up). Used for the listed groups when a plate is found plate_to_centre_mm below the globe centroid and centred within max_off_centre_mm; otherwise the lens / nerve-stump cues decide.",
+      "groups": [
+        "human"
+      ],
+      "near_mm": 6.0,
+      "tol_mm": 1.0,
+      "trials": 1500,
+      "plate_to_centre_mm": [
+        6.0,
+        11.0
+      ],
+      "max_off_centre_mm": 4.0
+    },
+    "globe_surface": {
+      "_comment": "method: smooth_star | opening (legacy, 3 mm opening; always used for shell eyes). Lengths in mm, angles in degrees. tol = how far a tissue edge may lie from the smooth surface and still be followed; band = how far from the stiff baseline an edge may lie and still be used; morph = half-width of the bumps/notches removed on the sphere.",
+      "method": "smooth_star",
+      "ray_step_deg": 1.5,
+      "ray_max_mm": 21.0,
+      "r_min_mm": 3.0,
+      "gap_min_mm": 0.3,
+      "gap_first_mm": 1.5,
+      "baseline_degrees": [
+        2,
+        2,
+        2,
+        4,
+        4,
+        4,
+        4
+      ],
+      "baseline_ridge": 0.0001,
+      "degree": 10,
+      "ridge": 0.0003,
+      "tol_mm": 0.6,
+      "band_mm": 1.5,
+      "morph_deg": 12.0,
+      "morph_min_mm": 0.3,
+      "use_marks": true,
+      "marks_sigma_min_deg": 1.5,
+      "marks_sigma_rel": 0.6,
+      "marks_side_mm": 0.6,
+      "marks_move_mm": 0.3,
+      "marks_overrule_deg": 10.0,
+      "marks_full_deg": 8.0,
+      "marks_reach_deg": 18.0,
+      "smooth_deg": 2.0,
+      "smooth_final_deg": 3.0
+    }
+  },
+  "mri": {
+    "_comment": "Pig MRI, Agilent 9.4 T, sequence gems (Ex-Vivo/MRI parameters.jpg): TR 550 ms, TE 7.5 ms, flip 20 deg, 16 averages, data matrix 512 x 512 over 40 x 40 mm (0.078 mm acquired, not interpolated), 36 slices of 0.8 mm, no gap, interleaved, no fat saturation, coil 72 mm volume. The eyes were in oil: the bath is displaced by the chemical shift. Along the rows the shift is computed from the DICOM tags (1.12 mm). Across the slices it depends on the radio-frequency pulse bandwidth, which is recorded nowhere; oil_slice_shift_mm is the value measured on the five fresh eyes (one-sided empty band across the slices 1.12-1.38 mm, minus the dark wall 0-0.38 mm: median 1.0 mm), applied to all of them because they share one protocol. No such band is seen in the preserved eyes (0).",
+    "oil_slice_shift_mm": {
+      "fresh": 1.0,
+      "preserved": 0.0
+    }
+  },
+  "scans": [
+    {
+      "id": "H1",
+      "group": "human",
+      "bath": "air",
+      "f": 4,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 1/CT/Eye1 Zoom No oil/HumanEye1 X Slices"
+    },
+    {
+      "id": "H2",
+      "group": "human",
+      "bath": "liquid",
+      "f": 4,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 2/CT/Eye 2 Zoom/HumanEye2 X Slices"
+    },
+    {
+      "id": "H3",
+      "group": "human",
+      "bath": "air",
+      "f": 2,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 3/CT/HumanEye3 X Slices"
+    },
+    {
+      "id": "H4",
+      "group": "human",
+      "bath": "air",
+      "f": 2,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 4/CT/HumanEye4 X Slices"
+    },
+    {
+      "id": "H5",
+      "group": "human",
+      "bath": "air",
+      "f": 4,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 5/CT/Slices (complete, from D-CT)/HumanEye5 X Slices",
+      "local_xdir": "{ct}/HumanEye5/Slices/HumanEye5 X Slices"
+    },
+    {
+      "id": "H6",
+      "group": "human",
+      "bath": "air",
+      "f": 4,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 6/CT/Slices (complete, from D-CT)/HumanEye6 X Slices",
+      "local_xdir": "{ct}/HumanEye6/Slices/HumanEye6 X Slices"
+    },
+    {
+      "id": "H7",
+      "group": "human",
+      "bath": "air",
+      "f": 4,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 7/CT/Slices (complete, from D-CT)/HumanEye7 X Slices",
+      "local_xdir": "{ct}/HumanEye7/Slices/HumanEye7 X Slices"
+    },
+    {
+      "id": "H8",
+      "group": "human",
+      "bath": "air",
+      "f": 4,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 8/CT/Slices (complete, from D-CT)/HumanEye8 X Slices",
+      "local_xdir": "{ct}/HumanEye8/Slices/HumanEye8 X Slices"
+    },
+    {
+      "id": "H9",
+      "group": "human",
+      "bath": "air",
+      "f": 4,
+      "xdir": "{box}/Human Eye/Fresh Human Eye/Eye 9/CT/Slices (complete, from D-CT)/HumanEye9 X Slices",
+      "local_xdir": "{ct}/HumanEye9/Slices/HumanEye9 X Slices"
+    },
+    {
+      "id": "F15",
+      "group": "fresh",
+      "bath": "liquid",
+      "f": 4,
+      "xdir": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 15/CT/pig Fresh eye 15 X Slices",
+      "local_xdir": "{ct}/Fresh Eye 15/pig Fresh eye 15 X Slices",
+      "mri": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 15/MRI"
+    },
+    {
+      "id": "F16",
+      "group": "fresh",
+      "bath": "liquid",
+      "f": 4,
+      "xdir": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 16/CT/pig Fresh eye 16 X Slices",
+      "local_xdir": "{ct}/Fresh Eye 16/pig Fresh eye 16 X Slices",
+      "mri": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 16/MRI"
+    },
+    {
+      "id": "F17",
+      "group": "fresh",
+      "bath": "liquid",
+      "f": 4,
+      "xdir": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 17/CT/pig Fresh eye 17 X Slices",
+      "local_xdir": "{ct}/Fresh Eye 17/pig Fresh eye 17 X Slices",
+      "mri": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 17/MRI"
+    },
+    {
+      "id": "F18",
+      "group": "fresh",
+      "bath": "air",
+      "f": 4,
+      "xdir": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 18/CT/pig Fresh eye 18 X Slices",
+      "local_xdir": "{ct}/Fresh Eye 18/pig Fresh eye 18 X Slices",
+      "mri": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 18/MRI"
+    },
+    {
+      "id": "F19",
+      "group": "fresh",
+      "bath": "liquid",
+      "f": 4,
+      "xdir": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 19/CT/pig Fresh eye 19 X Slices",
+      "local_xdir": "{ct}/Fresh Eye 19/pig Fresh eye 19 X Slices",
+      "mri": "{box}/Pig Eye/Fresh Pig Eye/Fresh Eye 19/MRI"
+    },
+    {
+      "id": "P11",
+      "group": "preserved",
+      "bath": "liquid",
+      "f": 4,
+      "shell": true,
+      "xdir": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 11/CT/Preserved eye_11 X Slices",
+      "local_xdir": "{ct}/Preserved Eye 11/Preserved eye_11 X Slices",
+      "mri": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 11/MRI"
+    },
+    {
+      "id": "P12",
+      "group": "preserved",
+      "bath": "liquid",
+      "f": 4,
+      "shell": true,
+      "xdir": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 12/CT/Preserved eye_12 X Slices",
+      "local_xdir": "{ct}/Preserved Eye 12/Preserved eye_12 X Slices",
+      "mri": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 12/MRI"
+    },
+    {
+      "id": "P13",
+      "group": "preserved",
+      "bath": "liquid",
+      "f": 4,
+      "shell": true,
+      "xdir": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 13/CT/Preserved eye_13 X Slices",
+      "local_xdir": "{ct}/Preserved Eye 13/Preserved eye_13 X Slices",
+      "mri": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 13/MRI"
+    },
+    {
+      "id": "P14",
+      "group": "preserved",
+      "bath": "liquid",
+      "f": 4,
+      "shell": true,
+      "xdir": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 14/CT/Preserved eye_14 X Slices",
+      "local_xdir": "{ct}/Preserved Eye 14/Preserved eye_14 X Slices",
+      "mri": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 14/MRI"
+    },
+    {
+      "id": "P15",
+      "group": "preserved",
+      "bath": "liquid",
+      "f": 4,
+      "shell": true,
+      "xdir": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 15/CT/Preserved eye_15 X Slices",
+      "local_xdir": "{ct}/Preserved Eye 15/Preserved eye_15 X Slices",
+      "mri": "{box}/Pig Eye/Preserved Pig Eye/Preserved Eye 15/MRI"
+    }
+  ]
+}
