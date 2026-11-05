@@ -29,3 +29,8 @@ from STEP files).
 The raw recordings (ex-vivo thermistor files, in-vivo session folders) and the COMSOL model files are not in
 this repository; they are available from the author on request. Paths to them are set at the top of each
 script or through environment variables named there.
+
+## Licence
+
+The code in `code/` is released under the MIT licence (`LICENSE`). The dissertation and the figures are
+copyright Luigi Mecacci, 2026; please cite the dissertation when using them.
