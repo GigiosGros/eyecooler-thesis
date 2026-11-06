@@ -9,7 +9,7 @@
 2. IOP test minus control per cooling duration from figures/aim3/sources/master_iop.csv:
    mean, 95 % and 90 % CI, paired t test, Hedges-corrected paired g (approx. 95 % CI).
 3. Writes figures/aim3/aim3_stats.csv: every number of this kind quoted in Ch4
-   (Cooling b_t / b_amp at 25 cd.s/m2: p, p_Holm, g; Jet and RM restoration b_t / b_amp: 90 % CI;
+   (Cooling b_t / b_amp / op_amp at 8 and 25 cd.s/m2: p, p_Holm, g; Jet and RM restoration: 90 % CI;
    IOP: 90 % CI), for the primary set (animals 2-6) and the ring-about-9.5-C group (Table 4.x).
 
 Holm: across the three cooling durations within Set x Comparison x Flash x Measure, on the paired
@@ -81,13 +81,15 @@ def main():
     rows = augment()
     out = []
     for sname, sval in SETS.items():
+        # 2026-11-05: the primary measures are the b-wave implicit time and amplitude and the summed OPs,
+        # each at 8 and 25 cd.s/m2 (Holm per measure and flash across the three durations); was b_t, b_amp at 25 only
         for comp in ("Cooling", "Jet restoration", "RM restoration"):
-            for meas in ("b_t", "b_amp"):
+            for fl, meas in [(fl, m) for fl in ("25", "8") for m in ("b_t", "b_amp", "op_amp")]:
                 for r in rows:
-                    if r["Set"] == sval and r["Comparison"].startswith(comp) and r["Flash"] == "25" \
+                    if r["Set"] == sval and r["Comparison"].startswith(comp) and r["Flash"] == fl \
                             and r["Measure"] == meas:
                         f = EC._f
-                        out.append(dict(set=sname, comparison=r["Comparison"], measure=meas, flash="25",
+                        out.append(dict(set=sname, comparison=r["Comparison"], measure=meas, flash=fl,
                                         duration=int(f(r["Duration_min"])), n=int(f(r["n_animals"])), pigs=r["Pigs"],
                                         mean_T_minus_C=f(r["Mean_T_minus_C"]), CI95_low=f(r["CI95_low"]),
                                         CI95_high=f(r["CI95_high"]), CI90_low=f(r["CI90_low"]),

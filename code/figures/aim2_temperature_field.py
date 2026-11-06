@@ -10,6 +10,7 @@ plane fields and draws them.
 Source: Analysis Code/scr-heat-replica/results/comsol_plane/
 Run:    python code/figures/aim2_temperature_field.py
 """
+import sys
 import shutil
 
 import matplotlib
@@ -19,7 +20,7 @@ import matplotlib.tri as mtri
 import numpy as np
 from matplotlib.collections import LineCollection
 
-from provenance import FIG, SOURCES, THESIS, record
+from provenance import FIG, SOURCES, THESIS, record, written_by_other
 
 BOX = THESIS.parents[2]
 ORIGIN = BOX / "03 - Experiments & Data" / "Analysis Code" / "scr-heat-replica" / "results" / "comsol_plane"
@@ -32,6 +33,10 @@ plt.rcParams.update({"font.size": 10, "axes.spines.top": False, "axes.spines.rig
 
 
 def main():
+    other = written_by_other("temperature-field.png", __file__)
+    if other and "--force" not in sys.argv:
+        print(f"temperature-field.png was last written by {other} (the figure the thesis uses); not overwritten. Use --force to replace it.")
+        return
     dst_dir = SOURCES / "data" / "model"
     dst_dir.mkdir(parents=True, exist_ok=True)
     snaps = []

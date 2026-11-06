@@ -40,6 +40,16 @@ def git_commit(path):
         return None
 
 
+
+def written_by_other(name, script, manifest=MANIFEST):
+    """Name of the script that last wrote figure `name`, if it is not `script` (so it is not overwritten by mistake)."""
+    manifest = pathlib.Path(manifest)
+    if not manifest.exists():
+        return None
+    entry = json.loads(manifest.read_text(encoding="utf-8")).get(name, {})
+    other = entry.get("script")
+    return other if other and pathlib.Path(other).name != pathlib.Path(script).name else None
+
 def record(script, outputs, inputs, origins=None, notes=None, manifest=MANIFEST):
     """Add or replace the manifest entries for `outputs` (default figures/aim2/MANIFEST.json)."""
     manifest = pathlib.Path(manifest)
