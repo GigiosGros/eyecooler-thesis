@@ -10,11 +10,26 @@ import pydicom
 from concurrent.futures import ThreadPoolExecutor
 
 
-def slice_files(xdir):
-    files = sorted(glob.glob(os.path.join(xdir, "*.dcm")))
-    if not files:
+_LISTED = {}
+
+
+def slice_files(xdir, tries=5):
+    """Sorted slice list. Box Drive sometimes lists a folder as empty or half full, so list
+    again until two listings in a row agree and are not empty (kept for the rest of the run)."""
+    import time
+    if xdir in _LISTED:
+        return _LISTED[xdir]
+    last = None
+    for t in range(tries):
+        files = sorted(glob.glob(os.path.join(xdir, "*.dcm")))
+        if files and last is not None and len(files) == len(last):
+            _LISTED[xdir] = files
+            return files
+        last = files
+        time.sleep(1.5 * (t + 1))
+    if not last:
         raise FileNotFoundError(f"no .dcm in {xdir}")
-    return files
+    return last
 
 
 def spacing(xdir):

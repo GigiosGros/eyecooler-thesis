@@ -218,8 +218,13 @@ def main():
                 for site in SIT:
                     y = s[site].values
                     above = bool(y[0] >= 35)
-                    rows.append(dict(source="python", variant=f"V{v}", Tb=Tb, Tc=Tc, site=site, T_off=y[0], T_end=y[-1], T_start_cooling=float(P[(v, 25, Tb, Tc)][site].iloc[0]),
-                                     never_below=above, minutes_interp=np.nan if above else t_interp(t, y, 35., False)))
+                    # cooling run of the same point: minutes from switch-on until the site first falls below 35 C
+                    c = P[(v, 25, Tb, Tc)]
+                    tc = c.index.values - c.index.values[0]
+                    yc = c[site].values
+                    rows.append(dict(source="python", variant=f"V{v}", Tb=Tb, Tc=Tc, site=site, T_off=y[0], T_end=y[-1], T_start_cooling=float(yc[0]),
+                                     never_below=above, minutes_interp=np.nan if above else t_interp(t, y, 35., False),
+                                     minutes_to_35_cooling=np.nan if yc.min() >= 35 else t_interp(tc, yc, 35., True)))
     pd.DataFrame(rows).to_csv(OUT / "reheat_persistence.csv", index=False)
 
     rows = []

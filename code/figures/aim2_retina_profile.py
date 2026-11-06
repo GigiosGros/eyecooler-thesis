@@ -14,6 +14,7 @@ still writes retina-profile.png; that file is no longer used in the thesis).
 Source: Analysis Code/scr-heat-replica/results/comsol_retina/
 Run:    python code/figures/aim2_retina_profile.py
 """
+import sys
 import csv
 import shutil
 
@@ -22,7 +23,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from provenance import FIG, SOURCES, THESIS, record
+from provenance import FIG, SOURCES, THESIS, record, written_by_other
 
 BOX = THESIS.parents[2]
 ORIGIN = BOX / "03 - Experiments & Data" / "Analysis Code" / "scr-heat-replica" / "results" / "comsol_retina"
@@ -44,6 +45,10 @@ def load(path):
 
 
 def main():
+    other = written_by_other("retina-temperature-profile.png", __file__)
+    if other and "--force" not in sys.argv:
+        print(f"retina-temperature-profile.png was last written by {other} (the figure the thesis uses); not overwritten. Use --force to replace it.")
+        return
     dst_dir = SOURCES / "data" / "model"
     dst_dir.mkdir(parents=True, exist_ok=True)
     snaps = []

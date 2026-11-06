@@ -66,9 +66,12 @@ def save(fig, name):
 USED.append(PY.parent / "mesh_steps.csv")
 g = pd.read_csv(PY.parent / "mesh_steps.csv")
 g = g[g.source == "python"]
-cfgp = SOURCES / "data" / "model" / "config.toml"
-USED.append(cfgp)
-nodes = tomllib.loads(cfgp.read_text(encoding="utf-8"))["mesh"]["dof_scr"]
+# vertex counts of the meshes as the program solves them (air and module layer removed), not COMSOL's counts
+nodp = PY.parent / "mesh_nodes_without_air.csv"
+USED.append(nodp)
+nodes = {}
+for _, r in pd.read_csv(nodp).iterrows():
+    nodes.setdefault(r.variant, {})[r.mesh] = r.vertices
 sites = ORDER + ["SCR"]
 fig, axs = plt.subplots(2, 4, figsize=(10, 5), constrained_layout=True)
 Y_HALF_SPAN = 0.5
@@ -130,24 +133,29 @@ save(fig, "material-effectiveness.png")
 # 5 ---- required ring temperature
 q = tab("required_ring_temperature.csv")
 q = q[(q.source == "python") & (q.variant == "V1")]
-fig, ax = plt.subplots(figsize=(6.2, 4.0), constrained_layout=True)
-ax.axhspan(-40, 4, color="#f2d7d5", zorder=0)
-ax.text(35.05, -37, "below the 4 °C floor of the device", fontsize=7.5, color="#922b21", va="bottom")
-TARGET_STYLE = {35.0: ("-", "o", True), 32.0: ("--", "o", False)}
-for tgt, (ls, mk, filled) in TARGET_STYLE.items():
-    for s in ["Vitreous Humor", "Retina Avg", "Posterior Sclera", "Optic Nerve Head"]:
+# one small panel per site, both targets in each, same axes so the panels compare directly
+SITES4 = ["Vitreous Humor", "Retina Avg", "Posterior Sclera", "Optic Nerve Head"]
+fig, axs = plt.subplots(2, 2, figsize=(6.4, 5.0), constrained_layout=True, sharex=True, sharey=True)
+TARGET_STYLE = {35.0: ("-", True), 32.0: ("--", False)}
+for k, (ax, s) in enumerate(zip(axs.flat, SITES4)):
+    ax.axhspan(-40, 4, color="#f2d7d5", zorder=0)
+    for tgt, (ls, filled) in TARGET_STYLE.items():
         d = q[(q.site == s) & (q["target (C)"] == tgt)].sort_values("Tb (C)")
-        ax.plot(d["Tb (C)"], d["required_ring_T (C)"], marker=mk, ls=ls, color=SITE_C[s],
+        ax.plot(d["Tb (C)"], d["required_ring_T (C)"], marker="o", ls=ls, color=SITE_C[s],
                 mfc=SITE_C[s] if filled else "white")
-ax.set_xlabel("Body temperature (°C)")
-ax.set_xticks([35, 37, 39])
-ax.set_ylabel("Ring temperature needed (°C)")
-ax.set_ylim(-40, 36)
-hs = [plt.Line2D([], [], color=SITE_C[s], lw=2, label=NAME[s])
-      for s in ["Vitreous Humor", "Retina Avg", "Posterior Sclera", "Optic Nerve Head"]]
+    ax.set_title(f"({'ABCD'[k]}) {NAME[s]}", fontsize=9.5, loc="left", pad=8)
+    ax.set_xticks([35, 37, 39])
+    ax.set_ylim(-40, 40)                 # headroom: the 35 C points sit at the top
+    ax.set_yticks([-40, -20, 0, 20, 40])
+    ax.grid(axis="y", color="0.9", lw=0.6)
+axs[1, 0].text(34.9, -38, "below the 4 °C floor\nof the device", fontsize=7, color="#922b21", va="bottom")
+for ax in axs[1]:
+    ax.set_xlabel("Body temperature (°C)")
+for ax in axs[:, 0]:
+    ax.set_ylabel("Ring temperature\nneeded (°C)")
 ht = [plt.Line2D([], [], color="#444", ls="-", marker="o", label="site at 35 °C"),
       plt.Line2D([], [], color="#444", ls="--", marker="o", mfc="white", label="site at 32 °C")]
-fig.legend(handles=hs + ht, frameon=False, fontsize=8.5, ncol=3, loc="lower center", bbox_to_anchor=(0.5, -0.14))
+fig.legend(handles=ht, frameon=False, fontsize=8.5, ncol=2, loc="lower center", bbox_to_anchor=(0.5, -0.06))
 save(fig, "required-ring-temperature.png")
 
 # 6 ---- model vs ex vivo
@@ -327,7 +335,9 @@ for v in ["V1", "V2", "V3"]:
         for itf in COL:
             ax.bar(p, r[COL[itf]], 0.8, bottom=bottom, color=IC[itf], edgecolor="k", lw=0.5)
             bottom += r[COL[itf]]
-        ax.text(p, bottom + 80, f"{r.eye_share_pct:.0f}%", ha="center", fontsize=7.5)
+        # the eye share sits inside the eye segment, the part it describes
+        ax.text(p, r.eye_J / 2, f"{r.eye_share_pct:.0f}%", ha="center", va="center", fontsize=7.5,
+                color="white", fontweight="bold")
         labels.append({"Baseline": "none", "0.5 mm": "0.5", "1.0 mm": "1.0"}[sil])
         pos.append(p)
         p += 1

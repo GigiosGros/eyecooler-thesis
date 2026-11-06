@@ -91,9 +91,12 @@ w3 = w3[w3.block == "W3"]
 print("W3 heat balance, percent", (100 * w3.heat_balance_error_W.abs() / w3.heat_in_W).agg(["mean", "max"]).to_dict())
 print(pd.read_csv(HX / "w13_equal_pumping.csv").query("coolant=='water' and inlet_C==4"))
 
-# the 43 C limit is checked against the peak of the heated face; only W3 (mean flow) stored it
+# the 43 C limit is checked against the peak of the whole heat exchanger: the larger of the peak of the heated
+# face and the hottest aluminium (in v3 the face is partly coolant, so the two differ); only W3 stored them
 pk = t[t.power_W.isin(LOADS) & t.ambient_C.isin(AMB) & t.flow_L_min.isin(FLOWS) & t.inlet_C.isin(INLETS)].copy()
-pk["peak_C"] = pk.inlet_C + pk.heated_face_max_above_inlet
+pk["face_peak_C"] = pk.inlet_C + pk.heated_face_max_above_inlet
+pk["peak_C"] = pk[["face_peak_C", "hottest_aluminium_C"]].max(axis=1)
+print("points where the hottest aluminium exceeds the face peak:", int((pk.hottest_aluminium_C > pk.face_peak_C + 1e-3).sum()))
 pk.to_csv(HX / "hx_36points_peak.csv", index=False)
 print(pk.groupby("design").peak_C.max())
 
@@ -106,10 +109,10 @@ for k, v in enumerate(("v1", "v2", "v3")):
     ax.axhline(43, color="#922b21", lw=1.2)
     ax.set_ylim(0, 46)
     ax.set_xticks(sorted(s.inlet_C.unique()))
-    ax.set_title(f"{v} (heated face)", fontsize=8.5)
+    ax.set_title(v, fontsize=9)
     ax.set_xlabel("Coolant inlet temperature (°C)" if k == 1 else "")
     if k == 0:
-        ax.set_ylabel("Peak temperature of the heated face (°C)")
+        ax.set_ylabel("Peak temperature of the\nheat exchanger (°C)")
     else:
         ax.tick_params(labelleft=False)
     if k == 2:

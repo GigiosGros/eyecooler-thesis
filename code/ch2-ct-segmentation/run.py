@@ -298,13 +298,20 @@ if __name__ == "__main__":
     a = ap.parse_args(); cfg = load_cfg()
     if a.mri_only:
         a.refresh_cache = "mri"
+    failed = []
     if not a.tables_only:
         ids = a.only or [s["id"] for s in cfg["scans"]]
         if a.jobs > 1:
             with ProcessPoolExecutor(a.jobs) as ex:
-                for msg in ex.map(_safe, [(i, a.refresh_cache) for i in ids]):
+                msgs = ex.map(_safe, [(i, a.refresh_cache) for i in ids])
+                for msg in msgs:
                     print(msg, flush=True)
+                    failed += [msg.split(":")[0]] if ": FAILED" in msg else []
         else:
             for i in ids:
-                print(_safe((i, a.refresh_cache)), flush=True)
+                msg = _safe((i, a.refresh_cache)); print(msg, flush=True)
+                failed += [msg.split(":")[0]] if ": FAILED" in msg else []
     tables(cfg)
+    if failed:
+        print("FAILED scans (their previous outputs were kept):", " ".join(failed), flush=True)
+        sys.exit(1)
