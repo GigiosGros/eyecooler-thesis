@@ -60,6 +60,8 @@ def augment():
 def iop_rows():
     m = pd.read_csv(IOP)
     m = m[(m.Duration_min > 0) & (m.Pig > 1)].dropna(subset=["Test_minus_Control"])
+    # 2026-11-08: session 3 of animal 3 left out of every measure (erg_cohort.EXCLUDED_SESSIONS)
+    m = m[~((m.Pig == 3) & m.Session.str.startswith("Session 3"))]
     keep = {"primary": m,
             "ring 9.5": m[~((m.Pig == 6) | ((m.Pig == 5) & m.Session.str.contains("Session [2-3]")))]}
     out = []

@@ -108,6 +108,9 @@ OP_WAVES = {}                  # (pig, sess, group, eye, flash) -> OP trace (75-
 OP_WINDOWS = {}                # same key -> (lo_ms, hi_ms): the window the OPs were measured in
 # Pig 1 is exploratory: the method changed a lot after it. Results start from Pig 2.
 EXPLORATORY_PIGS = {1}
+# Sessions left out of every summary (2026-11-08): (pig, session number) -> reason. Their rows are kept,
+# with Animal_set "excluded", so they can still be read.
+EXCLUDED_SESSIONS = {(3, 3): "systemic change in both eyes; the animal died in recovery from this session"}
 SET_PRIMARY, SET_ALL = "primary", "all incl. exploratory"
 # Animals reported in groups: Pig 1 exploratory, Pigs 2-3-4 together, Pigs 5-6 together.
 # The groups follow the animal (Pig 5 S1 still used the old calibration).
@@ -133,8 +136,16 @@ LAT_FILE = "erg_latency_overrides.csv"
 
 
 # ------------------------------------------------------------------ helpers
-def animal_set(pig):
-    return "exploratory" if int(pig) in EXPLORATORY_PIGS else "primary"
+def animal_set(pig, sess=None):
+    if int(pig) in EXPLORATORY_PIGS:
+        return "exploratory"
+    if sess is not None and (int(pig), session_no(str(sess))) in EXCLUDED_SESSIONS:
+        return "excluded"
+    return "primary"
+
+
+def excluded(r):
+    return animal_set(r["Pig"], r.get("Session")) == "excluded"
 
 
 def animal_group(pig):
@@ -160,11 +171,12 @@ def ring_group(pig, sess):
 def analysis_sets():
     """(name, keep) for every across-animal summary: primary first, as before, then each
     group of ANIMAL_GROUPS with more than one animal, then all animals."""
-    return ([(SET_PRIMARY, lambda r: animal_set(r["Pig"]) == "primary")]
-            + [(g, lambda r, g=g: animal_group(r["Pig"]) == g)
+    return ([(SET_PRIMARY, lambda r: animal_set(r["Pig"], r["Session"]) == "primary")]
+            + [(g, lambda r, g=g: animal_group(r["Pig"]) == g and not excluded(r))
                for g, ps in ANIMAL_GROUPS.items() if len(ps) > 1]
-            + [(g, lambda r, g=g: ring_group(r["Pig"], r["Session"]) == g) for g in (GROUP_WARM, GROUP_COLD)]
-            + [(SET_ALL, lambda r: True)])
+            + [(g, lambda r, g=g: ring_group(r["Pig"], r["Session"]) == g and not excluded(r))
+               for g in (GROUP_WARM, GROUP_COLD)]
+            + [(SET_ALL, lambda r: not excluded(r))])
 
 
 def primary_pigs_label(pigs):
@@ -540,7 +552,7 @@ def collect(study):
                         alt = rec.get("alt", {}).get((eye, fl), {})
                         alt_ab = alt.get("ab") or {}
                         recs_out.append(dict(
-                            Pig=pig, Animal_set=animal_set(pig), Animal_group=animal_group(pig),
+                            Pig=pig, Animal_set=animal_set(pig, sess_dir.name), Animal_group=animal_group(pig),
                             Session=sess_dir.name, Duration_min=session_minutes(sess_dir.name),
                             Group=gname, Label=rec["label"], DeviceTime=rec["devtime"],
                             WallTime=rec["walltime"], Min_after_switch_off=after_off,
@@ -620,7 +632,7 @@ def effects(by_key, sess_info):
                     if end_of_cooling:
                         missing = missing + [f"END OF COOLING: recorded {pm:g} min after switch-off "
                                              f"(< {RECOVERY_MIN_AFTER_OFF} min), not a recovery recording"]
-                    rows.append(dict(Pig=pig, Animal_set=animal_set(pig), Animal_group=animal_group(pig),
+                    rows.append(dict(Pig=pig, Animal_set=animal_set(pig, sess), Animal_group=animal_group(pig),
                                      Session=sess, Duration_min=info["minutes"],
                                      Comparison=comp, Electrode=el, Flash=fl, Measure=meas,
                                      Test_earlier=v["RE"][1], Test_later=v["RE"][0],
@@ -706,9 +718,9 @@ def restoration(eff, recs_out=()):
                       and r["Measure"] == meas]
                 # pooled over the PRIMARY set (Pig 1 is exploratory); the
                 # pool with Pig 1 is kept alongside (Limit_incl_exploratory)
-                pool_all = [r["dControl"] for r in rs
-                            if r["dControl"] is not None and r.get("Recovery_eligible", True)]
-                pool = [r["dControl"] for r in rs if animal_set(r["Pig"]) == "primary"
+                pool_all = [r["dControl"] for r in rs if not excluded(r)
+                            and r["dControl"] is not None and r.get("Recovery_eligible", True)]
+                pool = [r["dControl"] for r in rs if animal_set(r["Pig"], r["Session"]) == "primary"
                         and r["dControl"] is not None and r.get("Recovery_eligible", True)]
                 sd = float(np.std(pool, ddof=1)) if len(pool) >= 2 else None
                 sd_all = float(np.std(pool_all, ddof=1)) if len(pool_all) >= 2 else None
@@ -726,7 +738,7 @@ def restoration(eff, recs_out=()):
                         return 100.0 * (later - earlier) / abs(earlier) if abs(earlier) > 1e-9 else None
                     return later - earlier
                 cpool = [own(r["Control_later"], r["Control_earlier"]) for r in rs
-                         if r.get("Recovery_eligible", True) and animal_set(r["Pig"]) == "primary"]
+                         if r.get("Recovery_eligible", True) and animal_set(r["Pig"], r["Session"]) == "primary"]
                 cpool = [x for x in cpool if x is not None]
                 med = float(np.median(cpool)) if cpool else None
                 half = (max(RESTORE_K * 1.4826 * float(np.median(np.abs(np.array(cpool) - med))),
@@ -761,7 +773,7 @@ def restoration(eff, recs_out=()):
                         elif c_out:
                             flag = "control eye changed beyond its usual range - check the recording"
                     out.append(dict(Comparison=comp, Electrode=el, Flash=fl, Measure=meas,
-                                    Pig=r["Pig"], Animal_set=animal_set(r["Pig"]), Animal_group=animal_group(r["Pig"]),
+                                    Pig=r["Pig"], Animal_set=animal_set(r["Pig"], r["Session"]), Animal_group=animal_group(r["Pig"]),
                                     Session=r["Session"], Duration_min=r["Duration_min"],
                                     Test_minus_Control=dd, Control_change_SD_pooled=sd,
                                     n_pooled=len(pool), Limit=(RESTORE_K * sd if sd is not None else None),
@@ -823,7 +835,7 @@ def _between_sessions(by_key, sess_info, recs_out, grp, el, role):
                     dd = d["RE"] - d["LE"] if None not in d.values() else None
                     tk, nk = temp.get((pig, s, grp), (None, ""))
                     t1, n1 = temp.get((pig, ref, grp), (None, ""))
-                    out.append(dict(Pig=pig, Animal_set=animal_set(pig), Animal_group=animal_group(pig), Session=s, Reference=ref,
+                    out.append(dict(Pig=pig, Animal_set=animal_set(pig, s), Animal_group=animal_group(pig), Session=s, Reference=ref,
                                     Flash=fl, Measure=meas,
                                     dTest_vs_S1=d["RE"], dControl_vs_S1=d["LE"], Test_minus_Control=dd,
                                     Core_temp_C_session=tk, Core_temp_C_S1=t1,

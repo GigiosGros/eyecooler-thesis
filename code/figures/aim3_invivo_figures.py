@@ -307,15 +307,21 @@ def ring_figure(ring, out):
 
 def iop_figure(iop, out):
     iop = iop[(iop["Duration_min"] > 0) & iop["Pig"].isin(PIGS)]   # UPDATE-PIGS56: master has 5-6
+    # 2026-11-08: session 3 of animal 3 left out of every measure (erg_cohort.EXCLUDED_SESSIONS)
+    iop = iop[~((iop["Pig"] == 3) & iop["Session"].str.startswith("Session 3"))]
+    # 2026-11-08: animal 1 left out; ring about 9.5 C solid, about 4 C dotted (contact calibration from
+    # Pig 5 S2 and Pig 6 S1, CONTACT_CAL of erg_cohort.py)
+    iop = iop[iop["Pig"] > 1]
+    cold = {5: 2, 6: 1}
     fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.6), sharey=True)
     for ax, dur in zip(axes, (30, 60, 120)):
         sub = iop[iop["Duration_min"] == dur]
         for _, r in sub.iterrows():
             pig = int(r["Pig"])
             st = animal_style(pig)
-            ax.plot([0, 1], [r["dTest"], r["dControl"]], marker="o", ms=3.5, lw=0.8,
-                    color=st["color"], ls=st["ls"], mfc=st["mfc"], label=st["label"],
-                    zorder=1 if pig in EXPLORATORY else 2)
+            is_cold = int(r["Session"].split()[1]) >= cold.get(pig, 99)
+            ax.plot([0, 1], [r["dTest"], r["dControl"]], marker="^" if is_cold else "o", ms=3.5, lw=0.9,
+                    color=st["color"], ls=":" if is_cold else "-", label=st["label"])
         ax.axhline(0, lw=0.5, color="0.6")
         ax.set_xticks([0, 1], ["Test", "Control"])
         ax.set_xlim(-0.4, 1.4)
@@ -326,9 +332,38 @@ def iop_figure(iop, out):
         for h, lab in zip(*ax.get_legend_handles_labels()):
             handles.setdefault(lab, h)
     labs = sorted(handles)
+    from matplotlib.lines import Line2D
+    hs = [Line2D([], [], color=handles[k].get_color(), lw=1.2) for k in labs]
+    hs += [Line2D([], [], color="0.3", marker="o", ms=3.5, ls="-", lw=0.9),
+           Line2D([], [], color="0.3", marker="^", ms=3.5, ls=":", lw=0.9)]
+    labs = labs + ["Ring about 9.5 °C", "Ring about 4 °C"]
     # one legend below the panels, so it covers no data point
-    fig.legend([handles[k] for k in labs], labs, frameon=False, fontsize=7,
-               loc="lower center", ncol=len(labs))
+    fig.legend(hs, labs, frameon=False, fontsize=7, loc="lower center", ncol=len(labs))
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    fig.savefig(out, dpi=300)
+    plt.close(fig)
+
+
+def iop_between_figure(iop, out):
+    """2026-11-08: the tonometer reading before placement at each later session against that of session 1
+    (Pre_vs_S1_Test, Pre_vs_S1_Control of master_iop.csv), animals 2-6, session 3 of animal 3 left out."""
+    from matplotlib.lines import Line2D
+    iop = iop[(iop["Pig"] > 1) & ~((iop["Pig"] == 3) & iop["Session"].str.startswith("Session 3"))]
+    panels = [("Session 2", "Session 2"), ("Session 3", "Session 3"), ("Session 4", "Terminal session")]
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.6), sharey=True)
+    for ax, (key, title) in zip(axes, panels):
+        sub = iop[iop["Session"].str.startswith(key)].dropna(subset=["Pre_vs_S1_Test", "Pre_vs_S1_Control"])
+        for _, r in sub.iterrows():
+            st = animal_style(int(r["Pig"]))
+            ax.plot([0, 1], [r["Pre_vs_S1_Test"], r["Pre_vs_S1_Control"]], marker="o", ms=3.5, lw=0.9, color=st["color"])
+        ax.axhline(0, lw=0.5, color="0.6")
+        ax.set_xticks([0, 1], ["Test", "Control"])
+        ax.set_xlim(-0.4, 1.4)
+        ax.set_title(title, fontsize=9)
+    axes[0].set_ylabel("Reading before placement,\nchange from session 1 (mmHg)")
+    pigs = sorted(int(p) for p in iop["Pig"].unique())
+    hs = [Line2D([], [], color=animal_style(p)["color"], lw=1.2, marker="o", ms=3.5) for p in pigs]
+    fig.legend(hs, [f"Animal {p}" for p in pigs], frameon=False, fontsize=7, loc="lower center", ncol=len(pigs))
     fig.tight_layout(rect=(0, 0.08, 1, 1))
     fig.savefig(out, dpi=300)
     plt.close(fig)
@@ -349,10 +384,12 @@ def main():
     f1, f2 = FIG3 / "ring-temperature.png", FIG3 / "iop-change.png"
     ring_figure(ring, f1)
     iop_figure(iop, f2)
+    f3 = FIG3 / "iop-between-sessions.png"
+    iop_between_figure(iop, f3)
     inputs = sorted(RING.glob("*.csv")) + [RING / "events.json"] + [SRC / f for f in MASTER]
     origins_f = SRC / "origins.json"
     origins = json.loads(origins_f.read_text(encoding="utf-8")) if origins_f.exists() else {}
-    record(__file__, [f1, f2, csv_out], inputs, origins=origins,
+    record(__file__, [f1, f2, f3, csv_out], inputs, origins=origins,
            notes="Ring traces are 1-s means of the 10-Hz processed records; animals 1-4. "
                  "UPDATE-PIGS56: re-run with --refresh after animals 5 and 6.",
            manifest=FIG3 / "MANIFEST.json")
