@@ -89,11 +89,12 @@ def cold(r):
 
 
 def cooling_effect_figure(eff, out):
-    panels = [("b_t", "25", "b-wave implicit time,\nchange (ms)"), ("b_t", "8", None), ("b_t", "0.06", None),
-              ("b_amp", "25", "b-wave amplitude,\nchange (µV)"), ("b_amp", "8", None), ("b_amp", "0.06", None),
-              ("b_width", "25", "b-wave width at 80%,\nchange (ms)"), ("b_width", "8", None), ("b_width", "0.06", None),
-              ("op_amp", "25", "Oscillatory potentials,\nsum OP1-4, change (µV)"), ("op_amp", "8", None), (None, None, None)]
-    fig, axes = plt.subplots(4, 3, figsize=(7.0, 8.2))
+    # 2026-11-09: the 0.06 cd.s/m2 response is too small and variable to be measured, so it is not shown
+    panels = [("b_t", "25", "b-wave implicit time,\nchange (ms)"), ("b_t", "8", None),
+              ("b_amp", "25", "b-wave amplitude,\nchange (µV)"), ("b_amp", "8", None),
+              ("b_width", "25", "b-wave width at 80%,\nchange (ms)"), ("b_width", "8", None),
+              ("op_amp", "25", "Oscillatory potentials,\nsum OP1-4, change (µV)"), ("op_amp", "8", None)]
+    fig, axes = plt.subplots(4, 2, figsize=(6.4, 9.0))
     for ax, (meas, fl, ylab) in zip(axes.flat, panels):
         if meas is None:
             ax.axis("off")
@@ -131,9 +132,10 @@ def cooling_effect_figure(eff, out):
           Line2D([], [], marker="s", ls="none", color="k", label="Mean of all sessions\nand 95% CI")]
     labels = [x.get_label() for x in h]
     from matplotlib.legend_handler import HandlerTuple
-    axes[3][2].legend(h, labels, loc="center", frameon=False, fontsize=6.5, title="Change of each eye,\nbefore to during cooling",
-                      handler_map={tuple: HandlerTuple(ndivide=None, pad=0.6)})
-    fig.tight_layout()
+    fig.legend(h, labels, loc="lower center", ncol=4, frameon=False, fontsize=6.5,
+               title="Change of each eye, before to during cooling", title_fontsize=7,
+               handler_map={tuple: HandlerTuple(ndivide=None, pad=0.6)})
+    fig.tight_layout(rect=(0, 0.11, 1, 1))
     fig.savefig(out, dpi=200)
     plt.close(fig)
 

@@ -2,21 +2,19 @@
 """
 Trace-by-trace quality check of every ERG used in the cohort analysis.
 
-Reads ERG Cohort Analysis/erg_traces.npz (written by erg_cohort.py: our averaged trace
-and the device's reported trace for the same recording, both through the same 75 Hz
-low-pass) and the recordings table, and writes to ERG Cohort Analysis/:
+Reads ERG Cohort Analysis/erg_traces.npz (written by erg_cohort.py: our averaged trace through
+the 75 Hz low-pass) and the recordings table, and writes to ERG Cohort Analysis/:
 
   erg_qc.csv                      one row per trace: the checks below, and a verdict
-  fig_qc_pigN_<jet|rm>_flashF.png contact sheets - every trace in its own panel, ours
-                                  (black) over the device's (orange), flagged panels red;
+  fig_qc_pigN_<jet|rm>_flashF.png contact sheets - every trace in its own panel,
+                                  flagged panels red;
                                   at flashes 25 and 8 the OP trace under each (2026-10-28)
 
-Checks (each flags; none changes a value):
+Checks (each flags; none changes a value). Only our own values are used (2026-11-09: the RETeval's
+reported trace and cursor values are not read, so there is no comparison with the device):
   baseline     |mean of the 20 ms before the flash| > 10 uV       (offset error)
   pre-noise    SD of the 20 ms before the flash > 15 uV
   late level   |mean 150-200 ms| > 150 uV                          (drift / slow potential)
-  vs device    correlation with the device trace < 0.95, or our b-wave amplitude
-               off the device trace's by > 15 %                    (processing / scaling error)
   pick         a- or b-wave pick on the edge of its search window  (from the recordings table)
 
     python erg_qc.py
@@ -30,23 +28,22 @@ import numpy as np
 TOOLS = Path(__file__).resolve().parent
 STUDY = TOOLS.parent
 D = STUDY / "ERG Cohort Analysis"
-LIM = dict(baseline=10.0, pre_noise=15.0, late=150.0, corr=0.95, amp_rel=0.15)
+LIM = dict(baseline=10.0, pre_noise=15.0, late=150.0)
 EXPLORATORY_PIGS = {1}          # = erg_cohort.EXPLORATORY_PIGS
 OP_FLASHES = ("8", "25")        # = erg_all.OP_FLASHES
 
 
 def main():
     sys.path.insert(0, str(TOOLS))
-    import extract_erg as E
     z = np.load(D / "erg_traces.npz", allow_pickle=False)
-    grid, keys, ours, dev = z["grid"], list(z["keys"]), z["ours"], z["reported"]
+    grid, keys, ours = z["grid"], list(z["keys"]), z["ours"]
     with open(D / "erg_cohort_recordings.csv", encoding="utf-8") as fh:
         rec = {(r["Pig"], r["Session"], r["Group"], {"Test": "RE", "Control": "LE"}[r["Eye"]], r["Flash"]): r
                for r in csv.DictReader(fh)}
     pre = (grid >= -20) & (grid < 0)
     late = (grid >= 150) & (grid <= 200)
     rows = []
-    for k, y, d in zip(keys, ours, dev):
+    for k, y in zip(keys, ours):
         pig, sess, grp, eye, fl = k.split("|")
         r = rec.get((pig, sess, grp, eye, fl), {})
         flags = []
@@ -57,30 +54,16 @@ def main():
             flags.append(f"pre-flash noise {noise:.0f} uV")
         if abs(lv) > LIM["late"]:
             flags.append(f"late level {lv:+.0f} uV")
-        corr = amp_ratio = None
-        fin = np.isfinite(d)                  # the device trace ends at ~199 ms: compare the shared span
-        if fin.sum() > 300:
-            d0 = d - np.mean(d[pre & fin])
-            corr = float(np.corrcoef(y[fin], d0[fin])[0, 1])
-            d_full = np.where(fin, d0, d0[fin][-1])          # hold the last value for the pick search
-            mo, md = E.ab_metrics(grid, y, flash=fl), E.ab_metrics(grid, d_full, flash=fl)
-            if mo and md and abs(md["b_amp"]) > 1:
-                amp_ratio = mo["b_amp"] / md["b_amp"]
-            if corr < LIM["corr"]:
-                flags.append(f"shape differs from device (r {corr:.2f})")
-            if amp_ratio is not None and abs(amp_ratio - 1) > LIM["amp_rel"]:
-                flags.append(f"b-wave {100 * (amp_ratio - 1):+.0f} % vs device")
         if r.get("Pick_ok") == "False":
             flags.append("pick on window edge")
         rows.append(dict(Pig=int(pig), Session=sess, Group=grp, Eye=("Test" if eye == "RE" else "Control"),
                          Flash=fl, Baseline_uV=round(base, 1), Pre_noise_uV=round(noise, 1),
-                         Late_level_uV=round(lv, 1), Corr_vs_device=(round(corr, 3) if corr is not None else None),
-                         b_amp_vs_device=(round(amp_ratio, 3) if amp_ratio is not None else None),
+                         Late_level_uV=round(lv, 1),
                          Drift_flag=r.get("Drift_flag", ""), QC=("; ".join(flags) if flags else "ok")))
     with open(D / "erg_qc.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, list(rows[0]))
         w.writeheader(); w.writerows(rows)
-    sheets = contact_sheets(grid, keys, ours, dev, rows,
+    sheets = contact_sheets(grid, keys, ours, rows,
                             z["ops"] if "ops" in z.files else None,
                             z["op_window"] if "op_window" in z.files else None)
     bad = [r for r in rows if r["QC"] != "ok"]
@@ -89,7 +72,7 @@ def main():
         print(f"  P{r['Pig']} {r['Session'][:9]} {r['Group']:9s} {r['Eye']:7s} fl{r['Flash']:>4}: {r['QC']}")
 
 
-def contact_sheets(grid, keys, ours, dev, rows, ops=None, op_win=None):
+def contact_sheets(grid, keys, ours, rows, ops=None, op_win=None):
     """One contact sheet per pig x electrode x flash. At flashes 25 and 8 each trace has
     its OP trace (75-300 Hz, from erg_traces.npz) in a panel under it, same time axis,
     OP window shaded. Pig 1 is labelled exploratory."""
@@ -138,9 +121,6 @@ def contact_sheets(grid, keys, ours, dev, rows, ops=None, op_win=None):
                                 if op_win is not None and np.isfinite(op_win[n]).all():
                                     ax.axvspan(op_win[n][0], op_win[n][1], color="#7b3294", alpha=0.12, lw=0)
                             continue
-                        if np.isfinite(dev[n]).sum() > 300:
-                            d0 = dev[n] - np.nanmean(dev[n][(grid >= -20) & (grid < 0)])
-                            ax.plot(grid, d0, color="#ff7f0e", lw=1.4, alpha=0.8)
                         ax.plot(grid, ours[n], color="k", lw=0.8)
                         q = qc.get(k, "ok")
                         if q != "ok":
@@ -148,8 +128,7 @@ def contact_sheets(grid, keys, ours, dev, rows, ops=None, op_win=None):
                                 sp.set_color("#c00000"); sp.set_linewidth(1.6)
                             ax.text(0.02, 0.02, q[:60], transform=ax.transAxes, fontsize=5.5, color="#c00000",
                                     va="bottom", wrap=True)
-                fig.suptitle(f"Pig {pig}{' (exploratory)' if expl else ''} {el.upper()} flash {fl}: ours (black) "
-                             f"vs device reported (orange); red frame = QC flag"
+                fig.suptitle(f"Pig {pig}{' (exploratory)' if expl else ''} {el.upper()} flash {fl}: our average (black); red frame = QC flag"
                              + ("; under each: OPs 75-300 Hz (purple, shaded = OP window)" if with_op else ""),
                              fontsize=9)
                 fig.subplots_adjust(top=1 - 0.6 / (1.9 * sum(ratios) + 0.5), bottom=0.05, left=0.07, right=0.99)

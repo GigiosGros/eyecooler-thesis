@@ -51,8 +51,6 @@ REJECT_B_FRAC = 0.5            # ... or b-wave > 50 % away from the recording's 
 DETREND_PRE_MS = 1000.0
 PRE_BASE_MS = 20.0             # ISCEV pre-stimulus baseline (>= 20 ms) each sweep is referred to
 MIN_PRE_MS = 200.0             # a sweep needs at least this much pre-flash record
-DEVICE_FIELDS = {"AWaveTime": "a_t", "AWaveAmplitude": "a_amp",
-                 "BWaveTime": "b_t", "BWaveAmplitude": "b_amp"}
 REPEAT_SPREAD_MIN = 5          # intra timepoints within this many minutes = "repeats"
 # From 2026-10-23 oscillatory potentials are a PRIMARY ERG measure, handled as the
 # ISCEV 2022 standard (Robson et al., Doc Ophthalmol 144:165) sets out:
@@ -332,10 +330,7 @@ def extract(session_folder):
         if not any(r and r[0] == RIO.WAVEFORM_HEADER for r in rows):
             raise ValueError(f"{files[0].name}: no '{RIO.WAVEFORM_HEADER}' row in the "
                              f"first {MAX_SCAN_ROWS} rows")
-        # The richer exports also carry the RETeval's OWN cursor values (device-filtered,
-        # not necessarily good). Kept as a reference only, never used.
-        dev_rows = {r[0]: r for r in rows[:RIO.waveform_start(rows)]
-                    if r and r[0] in DEVICE_FIELDS}
+        # The richer exports also carry the RETeval's own cursor values: not read (2026-11-09).
         rows = rows[RIO.waveform_start(rows):]
 
         # group Info columns by timepoint (label + device time + electrode).
@@ -349,30 +344,22 @@ def extract(session_folder):
             g[(eye, flash)] = outc
 
         for (lab, dev, elec, wall), efmap in groups.items():
-            waves, device, reported, sweeps, alt, op_waves = {}, {}, {}, {}, {}, {}
+            # 2026-11-09: only our own values are used. The RETeval's reported waveform and its cursor
+            # values are not read for any purpose (no fallback, no reference, no comparison); a trace
+            # without a raw record is left out.
+            waves, sweeps, alt, op_waves = {}, {}, {}, {}
             for (eye, flash), outc in efmap.items():
                 a, b = outc.split("/")
                 mi, ui = _ci(a) - 1, _ci(b) - 1
-                dv = {k: _g(dev_rows[f], mi) for f, k in DEVICE_FIELDS.items() if f in dev_rows}
-                dv = {k: _num(v) for k, v in dv.items()}
-                dv = {k: v for k, v in dv.items() if v is not None}
-                if dv:
-                    device[(eye, flash)] = dv
-                t = [_g(r, mi) for r in rows]
-                v = [_g(r, ui) for r in rows]
-                tt, vv = E.seg0(t, v)
-                reported[(eye, flash)] = E.resample(tt, vv, GRID)     # device trace, reference
                 freq = _num(_g(freq_row, mi)) if freq_row else None
-                rw = raw_average(raw[mi][0], raw[mi][1], freq, flash) if WAVE_SOURCE == "raw" else None
-                if rw is not None:
-                    waves[(eye, flash)], sweeps[(eye, flash)], op_waves[(eye, flash)] = rw
-                    ra = raw_average(raw[mi][0], raw[mi][1], freq, flash, method=ALT_DRIFT_METHOD)
-                    if ra is not None:
-                        alt[(eye, flash)] = dict(ab=E.ab_metrics(GRID, ra[0], flash=flash),
-                                                 n_kept=sum(s["kept"] for s in ra[1]))
-                else:
-                    waves[(eye, flash)] = reported[(eye, flash)]
-                    sweeps[(eye, flash)] = []
+                rw = raw_average(raw[mi][0], raw[mi][1], freq, flash)
+                if rw is None:
+                    continue
+                waves[(eye, flash)], sweeps[(eye, flash)], op_waves[(eye, flash)] = rw
+                ra = raw_average(raw[mi][0], raw[mi][1], freq, flash, method=ALT_DRIFT_METHOD)
+                if ra is not None:
+                    alt[(eye, flash)] = dict(ab=E.ab_metrics(GRID, ra[0], flash=flash),
+                                             n_kept=sum(s["kept"] for s in ra[1]))
             ab = {k: E.ab_metrics(GRID, w, flash=k[1]) for k, w in waves.items()}
             # the 75 Hz low-pass waveform that ab_metrics
             # measures, so the analysis workbook embeds and reads the same trace.
@@ -383,8 +370,8 @@ def extract(session_folder):
                                  ab=ab.get(k))
                    for k, w in waves.items() if k[1] in OP_FLASHES}
             recs.append(dict(phase=phase, label=lab, electrode=elec, devtime=dev,
-                             walltime=wall, waves=waves, waves_f=waves_f, ab=ab, ops=ops, device_ab=device,
-                             waves_reported=reported, sweeps=sweeps, source=WAVE_SOURCE,
+                             walltime=wall, waves=waves, waves_f=waves_f, ab=ab, ops=ops,
+                             sweeps=sweeps, source=WAVE_SOURCE,
                              drift=DRIFT_METHOD, alt=alt,
                              repeats=repeats.get((lab, dev, elec, wall), []),
                              cool_on=cool_on, cool_off=cool_off))
