@@ -37,7 +37,7 @@ Restored: |dT - dC| <= 2 x SD of the control eye's own change dC over the same
 interval, the SD pooled over every pig and session (per electrode, flash, measure).
 Waveform: the RAW record of each flash step (2026-10-22), drift removed by a
 zero-phase 0.3 Hz high-pass (ISCEV 2022 lower corner), artefact-rejected sweeps averaged, 75 Hz low-pass; the
-device's Reported trace and cursor values are kept as reference only.
+device's Reported trace and cursor values are not used (2026-11-09: all values are ours).
 Oscillatory potentials (2026-10-23: primary, with a- and b-wave), as the ISCEV 2022
 standard sets out: the raw average WITHOUT the first flash of the step, band-passed
 75-300 Hz; wavelets on the b-wave's rising limb (a-wave trough, not before 10 ms, to
@@ -103,7 +103,6 @@ COMPARISONS = [  # name, later group, earlier group, electrode
     ("Rewarming (Post Jet - Intra Jet)", "Post Jet", "Intra Jet", "Jet"),
 ]
 RESTORATION = [c for c in COMPARISONS if "restoration" in c[0]]   # judged against 2 x SD
-REPORTED = {}                  # (pig, sess, group, eye, flash) -> device trace (filtered)
 OP_WAVES = {}                  # (pig, sess, group, eye, flash) -> OP trace (75-300 Hz), flashes 8/25
 OP_WINDOWS = {}                # same key -> (lo_ms, hi_ms): the window the OPs were measured in
 # Pig 1 is exploratory: the method changed a lot after it. Results start from Pig 2.
@@ -111,6 +110,10 @@ EXPLORATORY_PIGS = {1}
 # Sessions left out of every summary (2026-11-08): (pig, session number) -> reason. Their rows are kept,
 # with Animal_set "excluded", so they can still be read.
 EXCLUDED_SESSIONS = {(3, 3): "systemic change in both eyes; the animal died in recovery from this session"}
+# Single traces left out of every comparison (2026-11-09): (pig, session number, group, flash) -> reason, both eyes.
+# The recording row is kept, with the reason in Trace_excluded.
+EXCLUDED_TRACES = {(4, 1, "Pre Jet", "0.06"): "noise: bench sheet 'control noisy at first'; control trace swings "
+                                              "+-600 uV (947 uV pick), test trace flat (14 uV)"}
 SET_PRIMARY, SET_ALL = "primary", "all incl. exploratory"
 # Animals reported in groups: Pig 1 exploratory, Pigs 2-3-4 together, Pigs 5-6 together.
 # The groups follow the animal (Pig 5 S1 still used the old calibration).
@@ -535,20 +538,17 @@ def collect(study):
                         if m is None:
                             continue
                         key = (pig, sess_dir.name, gname, eye, fl)
-                        by_key[key] = m
-                        waves[key] = rec["waves_f"][(eye, fl)]
+                        trace_out = EXCLUDED_TRACES.get((int(pig), session_no(sess_dir.name), gname, str(fl)), "")
+                        if not trace_out:
+                            by_key[key] = m
+                            waves[key] = rec["waves_f"][(eye, fl)]
                         if m["op"] is not None:
                             OP_WAVES[key] = m["op"]["trace"]
                             OP_WINDOWS[key] = tuple(m["op"]["window"])
-                        rep = rec.get("waves_reported", {}).get((eye, fl))
-                        if rep is not None:
-                            REPORTED[key] = E.lowpass(EA.GRID, rep)      # device trace, same filter
-                        dv = rec.get("device_ab", {}).get((eye, fl), {})
                         sw = rec.get("sweeps", {}).get((eye, fl), [])
                         sw_b = [s["ab"]["b_amp"] for s in sw if s["kept"] and s["ab"]]
                         n_kept = sum(s["kept"] for s in sw)
-                        src = (f"raw ({rec.get('drift')}), mean of {n_kept}/{len(sw)} sweeps" if sw else
-                               "REPORTED (no raw record in this export)")
+                        src = f"raw ({rec.get('drift')}), mean of {n_kept}/{len(sw)} sweeps"
                         alt = rec.get("alt", {}).get((eye, fl), {})
                         alt_ab = alt.get("ab") or {}
                         recs_out.append(dict(
@@ -595,11 +595,8 @@ def collect(study):
                             LINEFIT_b_t_ms=alt_ab.get("b_t"),
                             LINEFIT_a_amp_uV=(round(-alt_ab["a_amp"], 2) if alt_ab else None),
                             LINEFIT_a_t_ms=alt_ab.get("a_t"),
-                            # RETeval's own cursors (device-filtered): reference only
-                            Device_b_amp_uV_REF=dv.get("b_amp"), Device_b_t_ms_REF=dv.get("b_t"),
-                            Device_a_amp_uV_REF=(-dv["a_amp"] if "a_amp" in dv else None),
-                            Device_a_t_ms_REF=dv.get("a_t"),
-                            Repeated_flash_steps=", ".join(f"{e} {f}" for e, f in rec.get("repeats", []))))
+                            Repeated_flash_steps=", ".join(f"{e} {f}" for e, f in rec.get("repeats", [])),
+                            Trace_excluded=trace_out))
     return recs_out, by_key, sess_info, waves
 
 
@@ -1252,13 +1249,11 @@ def main(argv=None):
     outdir.mkdir(exist_ok=True)
 
     recs_out, by_key, sess_info, waves = collect(study)
-    # every trace (ours + the device's reported one, same 75 Hz low-pass) to one file,
-    # so QC and plots need not re-read the raw records
+    # every trace (ours, 75 Hz low-pass) to one file, so QC and plots need not re-read the raw records
     keys = sorted(waves)
     np.savez_compressed(outdir / "erg_traces.npz", grid=EA.GRID,
                         keys=np.array(["|".join(map(str, k)) for k in keys]),
                         ours=np.array([waves[k] for k in keys]),
-                        reported=np.array([REPORTED.get(k, np.full_like(EA.GRID, np.nan)) for k in keys]),
                         # 75-300 Hz OP trace (average without the first flash); NaN at 0.06
                         ops=np.array([OP_WAVES.get(k, np.full_like(EA.GRID, np.nan)) for k in keys]),
                         op_window=np.array([OP_WINDOWS.get(k, (np.nan, np.nan)) for k in keys], float))
