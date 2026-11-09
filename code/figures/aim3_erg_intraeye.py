@@ -1,4 +1,4 @@
-﻿"""Chapter 4: change of each eye, test vs test, control vs control, and the two compared.
+"""Chapter 4: change of each eye, test vs test, control vs control, and the two compared.
 
 Output (figures/aim3/):
   erg_intraeye.csv   per set, comparison, flash, measure, duration: mean, SD, 95 % CI and paired
@@ -20,6 +20,8 @@ sessions, one per animal and duration, not across animals.
 
 Run:  python code/figures/aim3_erg_intraeye.py
 """
+import re
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -33,8 +35,21 @@ IOP = FIG3 / "sources" / "master_iop.csv"
 # (paired t test; Holm across the three durations within each measure), columns added to the
 # cooling summary by aim3_erg_stats.py; the set is the one of the table's first block
 SUMM = FIG3 / "sources" / "erg" / "erg_cohort_cooling_summary.csv"
-SUMM_SET = "Ring about 9.5 C (Pigs 2-4, Pig 5 S1)"
+# 2026-11-08: the main results are over both ring temperatures (animals 2-6, "primary" in the summary)
+SUMM_SET = "primary"
+MAIN = "animals 2-6"
 CONTACT_CAL = {5: 2, 6: 1}
+
+
+# 2026-11-08: session 3 of animal 3 (systemic change in both eyes; the animal died in recovery) is left
+# out of every measure; = EXCLUDED_SESSIONS of erg_cohort.py
+EXCLUDED = {(3, 3)}
+
+
+def drop_excluded(d):
+    sn = d.Session.str.extract(r"Session (\d+)", expand=False).astype(float)
+    bad = pd.Series([(int(p), int(s)) in EXCLUDED if s == s else False for p, s in zip(d.Pig, sn)], index=d.index)
+    return d[~bad]
 
 
 def cold(d):
@@ -80,13 +95,18 @@ def sg(v, d=1):
     return f"${v:+.{d}f}$"
 
 
-def cell(d, st, comp, fl, m, dur, who):
-    """Value (95 % CI); percent, one cell of the effects table."""
+def cell(d, st, comp, fl, m, dur, who, with_ci=None):
+    """Value (95 % CI); percent, one cell of the effects table.
+    2026-11-07 (simplified tables): the CI only on the test-against-control comparison, and not in the
+    ring-about-4-C block (one or two sessions)."""
     q = d[(d.set == st) & (d.comparison == comp) & (d.flash == fl) & (d.measure == m) & (d.duration == str(dur)) & (d.who == who)]
     a, p = q[q.unit == "abs"].iloc[0], q[q.unit == "pct"].iloc[0]
     dig = 0 if m in ("b_amp", "op_amp") else 1
-    ci = f" ({sg(a.lo, dig)}, {sg(a.hi, dig)})" if a.n > 1 and not np.isnan(a.lo) else ""
-    return f"{sg(a['mean'], dig)}{ci}; {sg(p['mean'], 0)}\\%"
+    if with_ci is None:
+        with_ci = who == "TvT-CvC"
+    ci = f" ({sg(a.lo, dig)}, {sg(a.hi, dig)})" if with_ci and a.n > 1 and not np.isnan(a.lo) else ""
+    # 2026-11-08: the tables give the change in the unit of the measure only; the percentages stay in the text
+    return f"{sg(a['mean'], dig)}{ci}"
 
 
 def pcell(v):
@@ -97,61 +117,106 @@ def pvals(summ, m, dur, fl=25):
     """p and p_Holm of the test-against-control comparison (the primary measures: b-wave and OPs, 8 and 25)."""
     q = summ[(summ.Set == SUMM_SET) & summ.Comparison.str.startswith("Cooling") & (summ.Flash == fl)
              & (summ.Measure == m) & (summ.Duration_min == dur)]
-    if m not in ("b_t", "b_amp", "op_amp") or q.empty:
-        return " & "
-    return f"{pcell(q.p_test_vs_control.iloc[0])} & {pcell(q.p_holm_test_vs_control.iloc[0])}"
+    if m not in ("b_t", "b_amp", "op_amp", "b_width") or q.empty:   # 2026-11-08: width too
+        return ""
+    return f"{pcell(q.p_holm_test_vs_control.iloc[0])}"
+
+
+def gval(summ, m, dur, fl):
+    """Hedges' g of the paired test-minus-control differences (g_paired of the cohort summary: d_z times the
+    small-sample correction), as a point estimate (2026-11-08)."""
+    q = summ[(summ.Set == SUMM_SET) & summ.Comparison.str.startswith("Cooling") & (summ.Flash == fl)
+             & (summ.Measure == m) & (summ.Duration_min == dur)]
+    if q.empty or not np.isfinite(q.g_paired.iloc[0]):
+        return ""
+    return sg(q.g_paired.iloc[0], 2)
 
 
 def effects_table(d, iop, summ):
-    names = [("b_t", "Implicit time (ms)"), ("b_amp", "Amplitude ($\\mu$V)"),
-             ("b_width", "Width at 80\\% (ms)"), ("op_amp", "Oscillatory potentials ($\\mu$V)")]
-    L = ["% Written by code/figures/aim3_erg_intraeye.py; do not edit.",
-         "\\begin{tabular}{L{2.2cm}R{0.6cm}L{2.9cm}L{2.9cm}L{3.0cm}R{0.85cm}R{0.85cm}}", "\\hline",
-         "\\textbf{Measure} & \\textbf{Min} & \\textbf{Test eye} & \\textbf{Control eye} & \\textbf{Test against control} & \\textit{p} & \\textit{p}\\textsubscript{Holm} \\\\", "\\hline",
-         "\\multicolumn{7}{l}{\\emph{Ring about 9.5~$^\\circ$C}} \\\\"]
-    # 2026-11-05: the primary measures are also given at 8 cd.s/m2 (b-wave and OPs), with their p and Holm
-    names8 = [(m, fl, lab if fl == 25 else lab.replace(" (", " at 8 (")) for m, lab in names
-              for fl in ((25, 8) if m in ("b_t", "b_amp", "op_amp") else ())]
-    for m, fl, lab in names8:
-        for k, dur in enumerate((30, 60, 120)):
-            L.append(f"{lab if k == 0 else ''} & {dur} & " + " & ".join(cell(d, "ring 9.5", "cooling", float(fl), m, dur, w) for w in ("TvT", "CvC", "TvT-CvC")) + " & " + pvals(summ, m, dur, fl) + " \\\\")
-    # 2026-11-05: with the 8 cd.s/m2 rows the table no longer fits on one page, so the intraocular pressure and the
-    # ring-about-4-C block go to a second table (erg-effects-4c-table.tex), without the p columns; so does the width,
-    # a secondary measure
-    L += ["\\hline", "\\end{tabular}"]
-    L2 = [L[0], "\\begin{tabular}{L{2.2cm}R{0.6cm}L{2.9cm}L{2.9cm}L{3.0cm}}", "\\hline",
-          "\\textbf{Measure} & \\textbf{Min} & \\textbf{Test eye} & \\textbf{Control eye} & \\textbf{Test against control} \\\\", "\\hline",
-          "\\multicolumn{5}{l}{\\emph{Ring about 9.5~$^\\circ$C}} \\\\"]
-    for k, dur in enumerate((30, 60, 120)):
-        L2.append(f"{'Width at 80% (ms)'.replace('%', chr(92) + '%') if k == 0 else ''} & {dur} & " + " & ".join(cell(d, "ring 9.5", "cooling", 25.0, "b_width", dur, w) for w in ("TvT", "CvC", "TvT-CvC")) + " \\\\")
-    g = iop[(iop.Pig > 1) & (iop.Duration_min > 0) & ~((iop.Pig == 6) | ((iop.Pig == 5) & iop.Session.str.contains("Session [2-3]")))]
-    for k, dur in enumerate((30, 60, 120)):
-        cs = []
-        for col in ("dTest", "dControl", "Test_minus_Control"):
-            s = stat(g[g.Duration_min == dur][col])
-            cs.append(f"{sg(s['mean'])} ({sg(s['lo'])}, {sg(s['hi'])})")
-        L2.append(f"{'Intraocular pressure (mmHg)' if k == 0 else ''} & {dur} & " + " & ".join(cs) + " \\\\")
-    # 2026-11-05: durations and session counts of the 4 C group from the data (was 30 and 60 min, "one session each",
-    # before animals 5 and 6 had their 120-min sessions)
-    q4 = d[(d.set == "ring 4") & (d.comparison == "cooling") & (d.flash == 25.0) & (d.measure == "b_t")
-           & (d.unit == "abs") & (d.who == "TvT")]
-    n4 = {dur: int(q4[q4.duration == str(dur)].n.iloc[0]) for dur in (30, 60, 120) if (q4.duration == str(dur)).any()}
-    words = {1: "one", 2: "two", 3: "three", 4: "four"}
-    lo, hi = min(n4.values()), max(n4.values())
-    nsess = f"{words[lo]} session{'s' if lo > 1 else ''} each" if lo == hi else f"{words[lo]} or {words[hi]} sessions at each duration"
-    L2 += ["\\hline", f"\\multicolumn{{5}}{{l}}{{\\emph{{ERG, ring about 4~$^\\circ$C, {nsess}}}}} \\\\"]
-    for m, lab in names:
-        for k, dur in enumerate(n4):
-            L2.append(f"{lab if k == 0 else ''} & {dur} & " + " & ".join(cell(d, "ring 4", "cooling", 25.0, m, dur, w) for w in ("TvT", "CvC", "TvT-CvC")) + " \\\\")
-    L2 += ["\\hline", "\\end{tabular}"]
-    return "\n".join(L) + "\n", "\n".join(L2) + "\n"
+    """2026-11-07: three tables, each with both ring levels -- the primary measures (b-wave implicit time and
+    amplitude, summed OPs) at 25 and at 8 cd.s/m2, and the secondary measures (b-wave width at 25 and 8, intraocular
+    pressure). The CI is given on the test-against-control difference with the ring at about 9.5 C; the ring-about-4-C
+    rows (one or two sessions) give the means only. p_Holm only for the primary measures at about 9.5 C."""
+    head = "% Written by code/figures/aim3_erg_intraeye.py; do not edit."
+    colspec = "L{2.4cm}R{0.6cm}L{1.8cm}L{1.8cm}L{4.0cm}R{1.0cm}R{0.9cm}"   # 2026-11-08: g column added
+    th = ("\\textbf{Measure} & \\textbf{Min} & \\textbf{Test eye} & \\textbf{Control eye} & "
+          "\\textbf{Test against control} & \\textit{p}\\textsubscript{Holm} & \\textit{g} \\\\")
+    # 2026-11-08: one block, both ring temperatures together (animals 2-6); the ring-level split stays in
+    # erg_intraeye.csv and is reported in the text only where it changes a result
+    sections = [(MAIN, None, (30, 60, 120))]
+
+    def erg_rows(st, durs, measures, with_p):
+        out = []
+        for m, fl, lab in measures:
+            for k, dur in enumerate(durs):
+                pv = pvals(summ, m, dur, fl) if with_p else ""
+                out.append(f"{lab if k == 0 else ''} & {dur} & "
+                           + " & ".join(cell(d, st, "cooling", float(fl), m, dur, w) for w in ("TvT", "CvC", "TvT-CvC"))
+                           + f" & {pv} & {gval(summ, m, dur, fl)} \\\\")
+        return out
+
+    def table(measures, with_p, extra=None):
+        L = [head, f"\\begin{{tabular}}{{{colspec}}}", "\\hline", th, "\\hline"]
+        for k, (st, title, durs) in enumerate(sections):
+            if k:
+                L.append("\\hline")
+            if title:
+                L.append(f"\\multicolumn{{7}}{{l}}{{\\emph{{{title}}}}} \\\\")
+            L += erg_rows(st, durs, measures, with_p)
+            if extra:
+                L += extra(st, durs)
+        return "\n".join(L + ["\\hline", "\\end{tabular}"]) + "\n"
+
+    prim = lambda fl: [("b_t", fl, "Implicit time (ms)"), ("b_amp", fl, "Amplitude ($\\mu$V)"),
+                       ("op_amp", fl, "Oscillatory potentials ($\\mu$V)")]
+
+    cold_iop = (iop.Pig == 6) | ((iop.Pig == 5) & iop.Session.str.contains("Session [2-3]"))
+
+    def iop_rows(st, durs):
+        g = iop[(iop.Pig > 1) & (iop.Duration_min > 0)]
+        if st == "ring 4":
+            g = g[cold_iop]
+        elif st == "ring 9.5":
+            g = g[~cold_iop]
+        out = []
+        # 2026-11-08: p_Holm of the paired t test of the test eye's change against the control eye's, Holm across
+        # the three session lengths, as for the ERG measures
+        ph = {}
+        if st != "ring 4":
+            ps = {d: stats.ttest_rel(g[g.Duration_min == d].dTest, g[g.Duration_min == d].dControl).pvalue for d in durs}
+            run = 0.0
+            for i, d in enumerate(sorted(ps, key=ps.get)):
+                run = max(run, min(1.0, (len(ps) - i) * ps[d]))
+                ph[d] = run
+        for k, dur in enumerate(durs):
+            cs = []
+            for col in ("dTest", "dControl", "Test_minus_Control"):
+                x = stat(g[g.Duration_min == dur][col])
+                ci = (st != "ring 4" and col == "Test_minus_Control" and np.isfinite(x["lo"]))
+                cs.append(f"{sg(x['mean'])} ({sg(x['lo'])}, {sg(x['hi'])})" if ci else sg(x["mean"]))
+            x = g[g.Duration_min == dur].Test_minus_Control.astype(float).dropna()
+            n = len(x)
+            gi = x.mean() / x.std(ddof=1) * (1 - 3 / (4 * (n - 1) - 1)) if n > 2 and x.std(ddof=1) > 0 else np.nan
+            out.append(f"{'Intraocular pressure (mmHg)' if k == 0 else ''} & {dur} & " + " & ".join(cs)
+                       + f" & {pcell(ph[dur]) if dur in ph else ''} & {sg(gi, 2) if np.isfinite(gi) else ''} \\\\")
+        return out
+
+    # 2026-11-08: the width goes with the other ERG measures of its flash; intraocular pressure has its own
+    # table, with the IOP results (the file name erg-effects-secondary-table.tex is kept)
+    width = lambda fl: [("b_width", fl, "Width at 80\\% (ms)")]
+    t25 = table(prim(25) + width(25), True)
+    t8 = table(prim(8) + width(8), True)
+    sec = table([], True, iop_rows)
+    return t25, t8, sec
 
 
 def power_table(p):
-    p = p[p.set == "ring 9.5"]
+    p = p[p.set == MAIN]   # 2026-11-08: both ring temperatures together, as the main results
     L = ["% Written by code/figures/aim3_erg_intraeye.py; do not edit.",
-         "\\begin{tabular}{L{3.0cm}L{2.4cm}R{1.1cm}R{0.8cm}R{1.2cm}R{1.2cm}R{1.2cm}R{1.2cm}}", "\\hline",
-         "\\textbf{Measure} & \\textbf{Comparison} & \\textbf{Mean change} & \\textbf{SD} & \\textbf{Change assumed} & \\textbf{Power, n=4} & \\textbf{Power, n=6} & \\textbf{n for 80\\%} \\\\", "\\hline"]
+         "\\begin{tabular}{L{3.4cm}L{2.8cm}R{1.4cm}R{1.0cm}R{1.6cm}R{1.6cm}}", "\\hline",
+         "\\textbf{Measure} & \\textbf{Comparison} & \\textbf{Mean change} & \\textbf{SD} & \\textbf{Change assumed} & \\textbf{Power, 5 animals} \\\\", "\\hline"]
+    # 2026-11-07: one power column, five animals (the number the study treats as adequate); n=4, n=6 and the
+    # n for 80 % stay in erg_power.csv
     who = {"TvT": "Test vs test", "CvC": "Control vs control", "TvT-CvC": "Test vs control"}
     pc = lambda v: "$>$99\\%" if not np.isfinite(v) or v > 0.99 else f"{100 * v:.0f}\\%"
     for lab, tex in (("implicit time (ms)", "b-wave implicit time (ms)"), ("implicit time (%)", "b-wave implicit time (\\%)"),
@@ -159,14 +224,14 @@ def power_table(p):
                      ("width at 80 % (%)", "b-wave width at 80\\% (\\%)")):
         for k, (w, wt) in enumerate(who.items()):
             r = p[(p.measure == lab) & (p.who == w)].iloc[0]
-            L.append(f"{tex if k == 0 else ''} & {wt} & {sg(r.mean_change)} & {r.sd:.1f} & {r.effect:.1f} & {pc(r.power_n4)} & {pc(r.power_n6)} & {r.n_for_80:.0f} \\\\")
+            L.append(f"{tex if k == 0 else ''} & {wt} & {sg(r.mean_change)} & {r.sd:.1f} & {r.effect:.1f} & {pc(r.power_n5)} \\\\")
     L += ["\\hline", "\\end{tabular}"]
     return "\n".join(L) + "\n"
 
 
 def main():
     e = pd.read_csv(EFF)
-    e = e[e.Recovery_eligible.astype(bool)].dropna(subset=["dTest", "dControl"])
+    e = drop_excluded(e[e.Recovery_eligible.astype(bool)].dropna(subset=["dTest", "dControl"]))
     rows, pw = [], []
     for sname, keep in SETS.items():
         s = e[keep(e)]
@@ -193,23 +258,24 @@ def main():
             for who, x in (("TvT", t), ("CvC", cc), ("TvT-CvC", t - cc)):
                 sd = x.std(ddof=1)
                 pw.append(dict(set=sname, measure=lab, who=who, n_sessions=len(x), mean_change=x.mean(), sd=sd,
-                               effect=size, power_n4=power(4, size / sd), power_n6=power(6, size / sd), n_for_80=n80(size / sd)))
+                               effect=size, power_n4=power(4, size / sd), power_n5=power(5, size / sd), power_n6=power(6, size / sd), n_for_80=n80(size / sd)))
     o1, o2 = FIG3 / "erg_intraeye.csv", FIG3 / "erg_power.csv"
     d = pd.DataFrame(rows)
     d["duration"] = d["duration"].astype(str)
     p = pd.DataFrame(pw)
     d.to_csv(o1, index=False)
     p.to_csv(o2, index=False)
-    iop = pd.read_csv(IOP)
+    iop = drop_excluded(pd.read_csv(IOP))
     t1, t2 = FIG3 / "erg-effects-table.tex", FIG3 / "erg-power-table.tex"
     summ = pd.read_csv(SUMM)
-    t1b = FIG3 / "erg-effects-4c-table.tex"
-    e1, e2 = effects_table(d, iop, summ)
+    t1b, t1c = FIG3 / "erg-effects-8-table.tex", FIG3 / "erg-effects-secondary-table.tex"
+    e1, e2, e3 = effects_table(d, iop, summ)
     t1.write_text(e1, encoding="utf-8")
     t1b.write_text(e2, encoding="utf-8")
+    t1c.write_text(e3, encoding="utf-8")
     t2.write_text(power_table(p), encoding="utf-8")
     print(pd.DataFrame(pw).round(2).to_string(index=False))
-    record(__file__, [o1, o2, t1, t1b, t2], [EFF, IOP, SUMM], origins={"figures/aim3/sources/erg/erg_cohort_effects.csv": "aim3_erg_figures.py --refresh"},
+    record(__file__, [o1, o2, t1, t1b, t1c, t2], [EFF, IOP, SUMM], origins={"figures/aim3/sources/erg/erg_cohort_effects.csv": "aim3_erg_figures.py --refresh"},
            notes="Within-eye changes and power by ring group.", manifest=FIG3 / "MANIFEST.json")
 
 

@@ -1,9 +1,8 @@
 """Chapter 4: electroretinogram results of the in-vivo study.
 
 Outputs (figures/aim3/):
-  erg-waveforms.png     one session per cooling duration (among sessions with a recovery
-                        recording, the animal with the median b-wave slowing): test and
-                        control eye, Jet electrode, before /
+  erg-waveforms.png     mean waveforms of animals 2-6, one row per cooling duration (both
+                        ring levels; animal 3 S3 left out): test and control eye, Jet electrode, before /
                         during cooling / recovery, flash 25 cd.s/m2 (a-, b-wave) and the
                         oscillatory potentials at flash 8 (75-300 Hz)
   erg-cooling-effect.png  change of each eye from its own recording before cooling (test vs
@@ -50,7 +49,7 @@ COHORT = STUDY / "ERG Cohort Analysis"
 FIG3 = THESIS / "figures" / "aim3"
 SRC = FIG3 / "sources" / "erg"
 FILES = ["erg_cohort_recordings.csv", "erg_cohort_cooling_summary.csv", "erg_cohort_restoration.csv",
-         "erg_cohort_effects.csv", "erg_traces.npz", "MANIFEST.json"]
+         "erg_cohort_effects.csv", "erg_cohort_between_sessions.csv", "erg_traces.npz", "MANIFEST.json"]
 SET = "Ring about 9.5 C (Pigs 2-4, Pig 5 S1)"      # the group with enough animals for statistics
 SHOWN = {1, 2, 3, 4, 5, 6}
 CONTACT_CAL = {5: 2, 6: 1}      # sessions in the ring-about-4-C group
@@ -105,13 +104,17 @@ def cooling_effect_figure(eff, out):
                   and r["Measure"] == meas and num(r["Duration_min"]) == d and int(r["Pig"]) in SHOWN]
             for col, off, mfc in (("dTest", -0.2, None), ("dControl", 0.2, "white")):
                 pts = [(int(r["Pig"]), num(r[col]), cold(r)) for r in rs if num(r[col]) is not None]
+                # 2026-11-08: the main results are over both ring temperatures; each session keeps its marker
+                # (circle about 9.5 C, triangle about 4 C), a little apart, and the mean of all sessions with its
+                # 95 % CI (black square) sits between them
                 for p, v, cd in pts:
-                    ax.plot(k + off + (p - 3.5) * 0.03, v, "^" if cd else "o", ms=3.5, color=PIG_COLORS[(p - 1) % 6], mfc=mfc)
-                vals = [v for p, v, cd in pts if p != 1 and not cd]
-                if len(vals) > 1:
-                    m, s = np.mean(vals), np.std(vals, ddof=1)
-                    h = stats.t.ppf(0.975, len(vals) - 1) * s / np.sqrt(len(vals))
-                    ax.errorbar(k + off + 0.13, m, yerr=h, fmt="s", color="k", ms=3.5, capsize=2, lw=0.9, mfc=mfc or "k")
+                    ax.plot(k + off + (0.07 if cd else -0.07), v, "^" if cd else "o", ms=3.5,
+                            color=PIG_COLORS[(p - 1) % 6], mfc=mfc)
+                vals = [v for p, v, cd in pts if p != 1]
+                if vals:
+                    m = np.mean(vals)
+                    yerr = stats.t.ppf(0.975, len(vals) - 1) * np.std(vals, ddof=1) / np.sqrt(len(vals)) if len(vals) > 1 else 0
+                    ax.errorbar(k + off, m, yerr=yerr, fmt="s", color="k", ms=3.5, capsize=2, lw=0.9, mfc=mfc or "k", zorder=5)
         ax.set_xticks(range(3))
         ax.set_xticklabels([f"{d} min" for d in DURS])
         ax.set_xlim(-0.5, 2.5)
@@ -123,9 +126,13 @@ def cooling_effect_figure(eff, out):
          for p in sorted(SHOWN)]
     h += [Line2D([], [], marker="o", ls="none", color="0.3", label="Filled: test eye"),
           Line2D([], [], marker="o", ls="none", color="0.3", mfc="white", label="Open: control eye"),
-          Line2D([], [], marker="^", ls="none", color="0.3", label="Triangle: ring about 4 °C"),
-          Line2D([], [], marker="s", ls="none", color="k", label="Mean at ring about 9.5 °C, 95% CI")]
-    axes[3][2].legend(handles=h, loc="center", frameon=False, fontsize=6.5, title="Change of each eye,\nbefore to during cooling")
+          Line2D([], [], marker="o", ls="none", color="0.5", label="Circle: ring about 9.5 °C"),
+          Line2D([], [], marker="^", ls="none", color="0.5", label="Triangle: ring about 4 °C"),
+          Line2D([], [], marker="s", ls="none", color="k", label="Mean of all sessions\nand 95% CI")]
+    labels = [x.get_label() for x in h]
+    from matplotlib.legend_handler import HandlerTuple
+    axes[3][2].legend(h, labels, loc="center", frameon=False, fontsize=6.5, title="Change of each eye,\nbefore to during cooling",
+                      handler_map={tuple: HandlerTuple(ndivide=None, pad=0.6)})
     fig.tight_layout()
     fig.savefig(out, dpi=200)
     plt.close(fig)
@@ -177,63 +184,66 @@ def dose_response_figure(recs, out):
 
 
 def waveform_figure(recs, summ, rest, out):
+    """Mean waveforms of the primary animals (2-6), one row per cooling duration (both ring levels): before
+    cooling, during cooling and the recovery recording, test and control eye, Jet electrode; a- and b-wave at
+    25 cd.s/m2 and OPs at 8 cd.s/m2. Each curve is the mean over the sessions that have that recording
+    (recovery: sessions with a recovery recording only). 2026-11-07: was one example session per duration."""
     z = np.load(SRC / "erg_traces.npz", allow_pickle=False)
     grid, keys = z["grid"], [str(k) for k in z["keys"]]
     idx = {k: i for i, k in enumerate(keys)}
     has_ops = "ops" in z.files
-    # sessions whose post Jet recording is a recovery recording (>= 10 min after switch-off)
-    eligible = {(int(r["Pig"]), int(float(r["Duration_min"]))) for r in rest
+    recovery = {(int(r["Pig"]), r["Session"]) for r in rest
                 if r["Comparison"].startswith("Jet") and r["Measure"] == "b_t" and r["Flash"] == "25"
                 and r["Verdict"] in ("restored", "NOT restored")}
-    # per duration: among those sessions, the animal whose b-wave slowing (flash 25) is the median
-    chosen = []
-    for d in DURS:
-        r = summary_row(summ, "Cooling", "25", "b_t", d)
-        if not r:
-            continue
-        pigs = [int(float(p)) for p in r["Pigs"].split(",") if p.strip()]
-        vals = [float(v) for v in r["Per_animal"].split(",") if v.strip()]
-        order = sorted((v, p) for v, p in zip(vals, pigs) if (p, d) in eligible)
-        if not order:
-            continue
-        chosen.append((d, order[(len(order) - 1) // 2][1]))
-    sess_of = {(int(r["Pig"]), int(float(r["Duration_min"]))): r["Session"] for r in recs}
+    sessions = sorted({(int(r["Pig"]), r["Session"]) for r in recs
+                       if int(r["Pig"]) > 1 and r["Group"] == "Intra Jet" and int(r["Session"].split()[1]) <= 3})
+    # 2026-11-07: one row per cooling duration, both ring levels together; session 3 of animal 3 left out,
+    # the session in which both eyes changed together (a systemic cause, Sec. 4.3)
+    SYSTEMIC = {(3, "Session 3 - 2hr")}
+    dur_of = {1: 30, 2: 60, 3: 120}
+    sessions = [ps for ps in sessions if ps not in SYSTEMIC]
+    levels = [(f"{d} min", [ps for ps in sessions if dur_of[int(ps[1].split()[1])] == d]) for d in DURS]
     ncol = 4 if has_ops else 2
-    fig, axes = plt.subplots(len(chosen), ncol, figsize=(7.0, 1.9 * len(chosen) + 0.5), squeeze=False)
-    for i, (d, p) in enumerate(chosen):
-        s = sess_of.get((p, d))
+    fig, axes = plt.subplots(len(levels), ncol, figsize=(7.0, 2.2 * len(levels) + 0.5), squeeze=False)
+    counts = []
+    for i, (lab, ss) in enumerate(levels):
+        nrow = {}
         for j, (eye, role) in enumerate((("RE", "Test"), ("LE", "Control"))):
             for kind, col, fl, arr, xlim in (("erg", j, "25", "ours", (-10, 120)),
                                              ("ops", 2 + j, "8", "ops", (0, 60))):
                 if kind == "ops" and not has_ops:
                     continue
                 ax = axes[i][col]
+                # 2026-11-08: one mean over both ring temperatures, as the main results
                 for g, gl, c in PHASES:
-                    k = f"{p}|{s}|{g}|{eye}|{fl}"
-                    if k in idx:
-                        y = z[arr][idx[k]]
-                        if np.isfinite(y).any():
-                            ax.plot(grid, y, color=c, lw=0.9, label=gl)
+                    use = [ps for ps in ss if g != "Post Jet" or ps in recovery]
+                    ys = [z[arr][idx[k]] for k in (f"{p}|{s}|{g}|{eye}|{fl}" for p, s in use) if k in idx]
+                    ys = [y for y in ys if np.isfinite(y).any()]
+                    if ys:
+                        ax.plot(grid, np.nanmean(ys, axis=0), color=c, lw=0.9)
+                    nrow[g] = max(nrow.get(g, 0), len(ys))
                 ax.axhline(0, color="0.85", lw=0.5); ax.axvline(0, color="0.85", lw=0.5)
                 ax.set_xlim(*xlim)
                 if i == 0:
                     ax.set_title(f"{role} eye\n" + ("a- and b-wave, 25" if kind == "erg" else "OPs, 8") + " cd·s/m²",
                                  fontsize=8)
                 if col == 0:
-                    ax.set_ylabel(f"{d} min (animal {p})\nµV")
-                if i == len(chosen) - 1:
+                    ax.set_ylabel(f"{lab}\n({nrow.get('Intra Jet', 0)} sessions)\nµV")
+                if i == len(levels) - 1:
                     ax.set_xlabel("Time from flash (ms)")
+        counts.append((lab, dict(nrow)))
     for row in axes:                       # same scale for the two eyes of each kind
-        for a, b in ((0, 1), (2, 3)):
-            if b < ncol:
-                lo = min(row[a].get_ylim()[0], row[b].get_ylim()[0]); hi = max(row[a].get_ylim()[1], row[b].get_ylim()[1])
-                row[a].set_ylim(lo, hi); row[b].set_ylim(lo, hi)
-    h, l = axes[0][0].get_legend_handles_labels()
-    fig.legend(h, l, loc="upper center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 1.0))
+        for a_, b_ in ((0, 1), (2, 3)):
+            if b_ < ncol:
+                lo = min(row[a_].get_ylim()[0], row[b_].get_ylim()[0]); hi = max(row[a_].get_ylim()[1], row[b_].get_ylim()[1])
+                row[a_].set_ylim(lo, hi); row[b_].set_ylim(lo, hi)
+    from matplotlib.lines import Line2D
+    h = [Line2D([], [], color=c, lw=1.2, label=gl) for _g, gl, c in PHASES]
+    fig.legend(handles=h, loc="upper center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 1.0), fontsize=7.5)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     fig.savefig(out, dpi=200)
     plt.close(fig)
-    return chosen
+    return counts
 
 
 # ------------------------------------------------------------------ numbers quoted
@@ -280,17 +290,18 @@ def numbers(summ, rest, recs, pooled, chosen):
     add("intra|ring_C", f"{min(intra):.1f} to {max(intra):.1f}")
     for (col, fl), v in pooled.items():
         add(f"dose|{col}|{fl}", f"slope {v['slope_per_C']:+.2f} per degC, r {v['r']:+.2f}, n {v['n']}")
-    add("waveform_examples", "; ".join(f"{d} min: animal {p}" for d, p in chosen))
+    add("waveform_means", "; ".join(f"{lab}: " + ", ".join(f"{g} {n}" for g, n in c.items()) for lab, c in chosen))
     return rows
 
 
 def main():
     if "--refresh" in sys.argv:
         refresh()
-    recs = [r for r in load("erg_cohort_recordings.csv") if int(r["Pig"]) in SHOWN]
+    # 2026-11-08: session 3 of animal 3 left out of every measure (Animal_set "excluded" in erg_cohort.py)
+    recs = [r for r in load("erg_cohort_recordings.csv") if int(r["Pig"]) in SHOWN and r["Animal_set"] != "excluded"]
     summ = [r for r in load("erg_cohort_cooling_summary.csv") if r["Set"] == SET]
-    rest = [r for r in load("erg_cohort_restoration.csv") if int(r["Pig"]) in SHOWN]
-    eff = load("erg_cohort_effects.csv")
+    rest = [r for r in load("erg_cohort_restoration.csv") if int(r["Pig"]) in SHOWN and r["Animal_set"] != "excluded"]
+    eff = [r for r in load("erg_cohort_effects.csv") if r["Animal_set"] != "excluded"]
     f1, f2, f3 = FIG3 / "erg-waveforms.png", FIG3 / "erg-cooling-effect.png", FIG3 / "erg-dose-response.png"
     chosen = waveform_figure(recs, summ, rest, f1)
     cooling_effect_figure(eff, f2)
@@ -300,7 +311,7 @@ def main():
     with open(out_csv, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, ["key", "value", "note"]); w.writeheader(); w.writerows(rows)
     for r in rows:
-        if r["key"].split("|")[0] in ("taken_together", "recovery", "intra", "dose", "waveform_examples") \
+        if r["key"].split("|")[0] in ("taken_together", "recovery", "intra", "dose", "waveform_means") \
                 or r["key"].endswith(("restored", "systemic")):
             print(r["key"], "=", r["value"], r["note"])
     man = json.loads((SRC / "MANIFEST.json").read_text(encoding="utf-8"))

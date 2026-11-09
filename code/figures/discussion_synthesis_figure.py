@@ -74,12 +74,12 @@ NAME_MODEL = dict(zip(SITES, ["Anterior Sclera", "Equatorial Sclera", "Vitreous 
 NAME_REPLICA = NAME_EXVIVO
 DURATIONS = [30, 60, 120]
 SESSION_OF = {30: "1", 60: "2", 120: "3"}
-PIGS = [1, 2, 3, 4, 5]  # animal 5: session 1 only, the ring-about-9.5-C group
+PIGS = [1, 2, 3, 4, 5, 6]  # 2026-11-08: both ring temperatures, as the Chapter 4 main results
 EXPLORATORY = {1}
 
 # Okabe-Ito (colour-blind safe) for the series; animal colours as in the Chapter 4 figures.
 C_HUMAN, C_PIG, C_BATH, C_PERF = "#0072B2", "#E69F00", "#CC79A7", "#009E73"
-ANIMAL = {2: "#d62728", 3: "#2ca02c", 4: "#9467bd", 5: "#8c564b"}
+ANIMAL = {2: "#ff7f0e", 3: "#2ca02c", 4: "#d62728", 5: "#9467bd", 6: "#8c564b"}   # tab10, as PIG_COLORS of Chapter 4
 EXPL = "0.55"
 
 plt.rcParams.update({"font.family": "Arial", "font.size": 8.5, "axes.spines.top": False,
@@ -145,16 +145,16 @@ def main():
     hold = {}
     for r in rt:
         if r["hold_mean_C"]:
-            if int(r["pig"]) == 6 or (int(r["pig"]) == 5 and int(r["session"]) > 1):
-                continue            # ring about 4 C; panel C is the group at about 9.5 C
-            hold[(int(r["pig"]), int(r["duration_planned_min"]))] = float(r["hold_mean_C"]) + 5.5   # corrected
+            cold = int(r["pig"]) == 6 or (int(r["pig"]) == 5 and int(r["session"]) > 1)
+            # corrected: +5.5 C before the corrected calibration; the ring-about-4-C sessions read true
+            hold[(int(r["pig"]), int(r["duration_planned_min"]))] = float(r["hold_mean_C"]) + (0 if cold else 5.5)
     for (p, d), v in sorted(hold.items()):
         values.append(("C", "ring hold temperature", d, p, v, "", "", "ring_temperature_summary.csv",
                        f"pig {p}, session {SESSION_OF[d]}: hold_mean_C"))
     eg = rows("erg_cohort_cooling_summary.csv")
     delay, mean_delay = {}, {}
     for d in DURATIONS:
-        r = [x for x in eg if x["Comparison"].startswith("Cooling") and x["Flash"] == "25" and x["Measure"] == "b_t" and x["Set"].startswith("Ring about 9.5")
+        r = [x for x in eg if x["Comparison"].startswith("Cooling") and x["Flash"] == "25" and x["Measure"] == "b_t" and x["Set"] == "primary"
              and int(x["Duration_min"]) == d]
         assert len(r) == 1, d
         pigs = [int(p) for p in r[0]["Pigs"].split(",")]
@@ -199,21 +199,22 @@ def main():
     # (C) left: ring hold temperature
     for p in PIGS:
         pts = [(d, hold[(p, d)]) for d in DURATIONS if (p, d) in hold]
-        jit = (p - 2.5) * 4
+        jit = (p - 3.5) * 3
         if p in EXPLORATORY:
             axC1.plot([d + jit for d, _ in pts], [v for _, v in pts], "o", color=EXPL, mfc="white", ms=4.5)
         else:
             axC1.plot([d + jit for d, _ in pts], [v for _, v in pts], "o", color=ANIMAL[p], ms=4.5)
-    axC1.axhline(9.5, color="0.3", ls=":", lw=0.8)
-    axC1.text(12, 9.53, "set point", fontsize=7, color="0.3", ha="left", va="bottom")
-    axC1.set_ylim(8.5, 10.5)
+    for sp in (9.5, 4.0):
+        axC1.axhline(sp, color="0.3", ls=":", lw=0.8)
+        axC1.text(12, sp + 0.1, "set point", fontsize=7, color="0.3", ha="left", va="bottom")
+    axC1.set_ylim(3, 11)
     axC1.set_ylabel("Ring hold temperature (°C)")
     axC1.set_title("(C) In vivo, Aim 3: ring", loc="left", fontsize=9.5, fontweight="bold")
     # (C) right: b-wave delay
     axC2.bar(DURATIONS, [mean_delay[d] for d in DURATIONS], 16, color="0.85", zorder=0)
     for p in PIGS:
         pts = [(d, delay[(p, d)]) for d in DURATIONS if (p, d) in delay]
-        jit = (p - 2.5) * 3
+        jit = (p - 3.5) * 2.5
         if p in EXPLORATORY:
             axC2.plot([d + jit for d, _ in pts], [v for _, v in pts], "o", color=EXPL, mfc="white", ms=4.5)
         else:
@@ -226,11 +227,11 @@ def main():
         ax.set_xticks(DURATIONS, ["30", "60", "120"])
         ax.set_xlim(10, 140)
         ax.set_xlabel("Cooling duration (min)")
-    handles = [Line2D([], [], color=ANIMAL[p], marker="o", ms=4.5, ls="none", label=f"Animal {p}") for p in (2, 3, 4)]
+    handles = [Line2D([], [], color=ANIMAL[p], marker="o", ms=4.5, ls="none", label=f"Animal {p}") for p in (2, 3, 4, 5, 6)]
     handles.append(Line2D([], [], color=EXPL, marker="o", mfc="white", ms=4.5, ls="none",
                           label="Animal 1 (exploratory)"))
     handles.append(Patch(color="0.85", label="Mean, as in Chapter 4"))
-    fig.legend(handles=handles, frameon=False, fontsize=7.5, ncol=5, loc="lower center",
+    fig.legend(handles=handles, frameon=False, fontsize=7.5, ncol=4, loc="lower center",
                bbox_to_anchor=(0.5, -0.01), handlelength=1.6, columnspacing=1.0)
     fig.subplots_adjust(left=0.09, right=0.99, top=0.95, bottom=0.14)
     OUT.mkdir(parents=True, exist_ok=True)
