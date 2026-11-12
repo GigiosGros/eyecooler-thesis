@@ -158,11 +158,13 @@ def _reject(eps, flash):
             for i in range(len(eps))]
 
 
-def raw_average(t, v, freq, flash, method=None):
+def raw_average(t, v, freq, flash, method=None, keep=None):
     """Mean of the accepted raw sweeps on GRID -> (wave, [per-sweep dicts], OP wave), or
     None when the record cannot be epoched (no frequency / no complete sweep). The OP
     wave is the same mean WITHOUT the step's first flash (ISCEV 2022: only the OPs to
-    the second and later flashes are retained or averaged); None if nothing is left."""
+    the second and later flashes are retained or averaged); None if nothing is left.
+    keep = sweep numbers (1-based) chosen by hand (Reference/erg_sweep_overrides.csv); they replace the
+    automatic rejection for this trace."""
     if not freq or freq <= 0 or len(t) < 100:
         return None
     t = np.frombuffer(t, dtype=float) if isinstance(t, array) else np.asarray(t, float)
@@ -171,6 +173,10 @@ def raw_average(t, v, freq, flash, method=None):
     if not eps:
         return None
     sw = _reject(eps, flash)
+    if keep:
+        for i, s in enumerate(sw):
+            s["kept"] = (i + 1) in keep
+            s["reason"] = "kept by hand (erg_sweep_overrides.csv)" if s["kept"] else "left out by hand (erg_sweep_overrides.csv)"
     kept = np.array([e for (e, _n, _d), s in zip(eps, sw) if s["kept"]])
     later = [e for i, ((e, _n, _d), s) in enumerate(zip(eps, sw)) if s["kept"] and i > 0]
     return kept.mean(axis=0), sw, (np.mean(later, axis=0) if later else None)
@@ -207,6 +213,26 @@ def op_metrics(t_ms, uv, per_s=None, ab=None):
         times.append(float(t_ms[j]))
     return dict(trace=op, amps=amps, times=times, sum=(float(sum(amps)) if amps else None),
                 rms=float(np.sqrt(np.mean(op[idx] ** 2))), window=(lo_ms, hi_ms))
+
+
+def op_rewindow(op, a_t, b_t):
+    """The OPs of an op_metrics() result measured again in the window bounded by other a-/b-wave picks
+    (hand-corrected ones): same filtered trace, same peak rule. Returns a new dict."""
+    from scipy.signal import find_peaks
+    tr = np.asarray(op["trace"], float)
+    lo_ms, hi_ms = max(float(a_t), OP_WIN[0]), float(b_t) + OP_AFTER_B_MS
+    idx = np.where((GRID >= lo_ms) & (GRID <= hi_ms))[0]
+    if len(idx) < 5:
+        return op
+    pk, _ = find_peaks(tr[idx], height=0.0)
+    amps, times = [], []
+    for p in pk[:OP_N]:
+        j = idx[p]
+        lo = idx[0] + (pk[pk < p][-1] if (pk < p).any() else 0)
+        amps.append(float(tr[j] - tr[lo:j + 1].min()))
+        times.append(float(GRID[j]))
+    return dict(op, amps=amps, times=times, sum=(float(sum(amps)) if amps else None),
+                rms=float(np.sqrt(np.mean(tr[idx] ** 2))), window=(lo_ms, hi_ms))
 
 
 def _wallmin(s):
@@ -279,10 +305,34 @@ def _flash_key(f):
         return str(f)
 
 
+SWEEP_FILE = "erg_sweep_overrides.csv"
+
+
+def load_sweep_overrides(session_folder):
+    """{(device time, eye, flash): set of sweep numbers to keep} for one session, from
+    <Pig N>/Reference/erg_sweep_overrides.csv (columns Session, DeviceTime, Eye, Flash, Keep, Note;
+    Keep = sweep numbers separated by ';'). Sweeps chosen by hand where the automatic rejection
+    kept an artefact or dropped a clean sweep (2026-11-12)."""
+    import csv
+    from pathlib import Path
+    p = Path(session_folder).parent / "Reference" / SWEEP_FILE
+    out = {}
+    if not p.exists():
+        return out
+    with open(p, newline="", encoding="utf-8-sig") as fh:
+        for r in csv.DictReader(fh):
+            if r["Session"].strip() != Path(session_folder).name:
+                continue
+            keep = {int(x) for x in str(r["Keep"]).replace(",", ";").split(";") if x.strip()}
+            out[(str(r["DeviceTime"]).strip(), r["Eye"].strip().upper(), _flash_key(r["Flash"]))] = keep
+    return out
+
+
 def extract(session_folder):
     erg = RIO.erg_folder(session_folder)      # '06 - ...' / '05 - ...' at End of Life
     if erg is None:
         return []
+    sweep_ov = load_sweep_overrides(session_folder)
     recs = []
     for phase, sub in PHASES:
         files = RIO.phase_files(erg, phase, sub, session_folder)
@@ -352,11 +402,13 @@ def extract(session_folder):
                 a, b = outc.split("/")
                 mi, ui = _ci(a) - 1, _ci(b) - 1
                 freq = _num(_g(freq_row, mi)) if freq_row else None
-                rw = raw_average(raw[mi][0], raw[mi][1], freq, flash)
+                rw = raw_average(raw[mi][0], raw[mi][1], freq, flash,
+                                 keep=sweep_ov.get((str(dev).strip(), eye, flash)))
                 if rw is None:
                     continue
                 waves[(eye, flash)], sweeps[(eye, flash)], op_waves[(eye, flash)] = rw
-                ra = raw_average(raw[mi][0], raw[mi][1], freq, flash, method=ALT_DRIFT_METHOD)
+                ra = raw_average(raw[mi][0], raw[mi][1], freq, flash, method=ALT_DRIFT_METHOD,
+                                 keep=sweep_ov.get((str(dev).strip(), eye, flash)))
                 if ra is not None:
                     alt[(eye, flash)] = dict(ab=E.ab_metrics(GRID, ra[0], flash=flash),
                                              n_kept=sum(s["kept"] for s in ra[1]))
