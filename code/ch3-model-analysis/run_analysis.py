@@ -42,6 +42,7 @@ sys.path.insert(0, HERE)
 
 import comsol_analysis  # noqa: E402
 from comsol_analysis import rescale  # noqa: E402
+from comsol_analysis.sensitivity_sheets import sensitivity_sheets  # noqa: E402
 from comsol_analysis import (comparisons, dimensionless, effectiveness, energy, exvivo, figures, io,  # noqa: E402
                              mesh, metrics, resistance, sensitivity, waterblock)
 from comsol_analysis.safe_write import save_csv, save_text  # noqa: E402
@@ -236,6 +237,7 @@ def write_outputs(res: dict, cfg: dict, data_dir: str, out: str, cfg_path: str):
               "Kinetics_summary": res["kinetics_summary"], "Reheat_persistence": res["persistence"],
               "Design_across_conditions": res["design"], "ExVivo_comparison": res["exvivo"],
               "WB_flow_model_GCI": res["flow_gci"], "WB_hot_side_R": res["hot_side"], "WB_R_vs_flow": res["r_vs_flow"]}
+    sheets.update(sensitivity_sheets(out))      # 07_sensitivity tables (written above), long format
     xlsx = os.path.join(folder("00_summary"), "model_analysis.xlsx")
     tmp = xlsx.replace(".xlsx", ".tmp.xlsx")
     with pd.ExcelWriter(tmp, engine="openpyxl") as xw:

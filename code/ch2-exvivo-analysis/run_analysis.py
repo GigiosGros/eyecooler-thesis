@@ -3,7 +3,8 @@
     python run_analysis.py --data path/to/UploadExperiment --out results
 
 Writes to --out:
-  00_summary/           report.md (readable summary), run_log.json (parameters, software
+  00_summary/           report.md (readable summary), aim1_exvivo_analysis.xlsx (every result
+                        table in one workbook), run_log.json (parameters, software
                         versions, SHA-256 of every input file, trace counts)
   01_quality_control/   exclusions.csv, spatial_screen.csv, temperature_fence.csv
                         (report only, never applied), spatial_screen.png
@@ -36,6 +37,7 @@ sys.path.insert(0, HERE)
 
 import scec_analysis
 from scec_analysis.safe_write import save_csv, save_text
+from scec_analysis.workbook import build_workbook
 from scec_analysis import (auxiliary, calibration, diagnostics, endpoints, figures, io, processing, qc,
                            statistics, uncertainty)
 
@@ -259,6 +261,7 @@ def write_outputs(res: dict, cfg: dict, data_dir: str, out: str, cfg_path: str):
            "noise_95CI_C": res["noise_95"], "U_absolute_k2_C": ua[2], "U_differential_k2_C": ud[2]}
     save_text(json.dumps(log, indent=2, default=str), os.path.join(folder("00_summary"), "run_log.json"))
     write_report(res, cfg, counts, os.path.join(folder("00_summary"), "report.md"))
+    build_workbook(out)                        # every CSV above in one Excel file
 
 
 def _true(x) -> bool:

@@ -5,6 +5,14 @@
     python run_all.py --studies ring_comparison mesh_study
     python run_all.py --figures-only          # redraw figures from stored results
 
+The rewarming comparison of the thesis (Section 3.3.1: 0.075 C in the tissue, 0.11 C at the ring,
+0.054 C at the end) uses short steps across the release of the ring (0.5 s to 6 s, 1 s to 18 s,
+3 s to 60 s). They are applied only when the environment variable SCR_RELEASE_STEPS=1 is set:
+    SCR_RELEASE_STEPS=1 python run_all.py --studies reheat --full --out results/reheat_release
+(PowerShell: $env:SCR_RELEASE_STEPS = "1"; python run_all.py --studies reheat --full --out results/reheat_release)
+Without it the release is crossed with the standard 6 s step and the rewarming difference is about
+four times larger (0.32 C tissue, 0.33 C ring). The variable is recorded in MANIFEST.json (settings).
+
 Studies: ring_comparison, mesh_study, material_sweep, silicone,
 parametric_sweep, reheat.  Each case reads its model definition and mesh from
 the .mph archive, solves the stationary start and the transient(s), and is
@@ -416,6 +424,9 @@ def main():
         manifest = dict(created=datetime.datetime.now().isoformat(timespec="seconds"),
                         code="run_all.py + replica/ (see README.md)",
                         settings=dict(time_scheme="BDF2", stages="6 s to 5 min, 15 s to 15 min, then 30 s",
+                                      release_steps=("0.5 s to 6 s, 1 s to 18 s, 3 s to 60 s after the release "
+                                                     "(SCR_RELEASE_STEPS=1)") if os.environ.get("SCR_RELEASE_STEPS") == "1"
+                                      else "standard steps across the release (SCR_RELEASE_STEPS not set)",
                                       elements="linear tetrahedra on the mesh stored in each .mph"),
                         inputs=sorted({c["mph"] for c in cases} | {c["ref"][1] for c in cases}),
                         cases=[dict(study=c["study"], id=c["id"], mph=os.path.basename(c["mph"]), component=c["comp"],

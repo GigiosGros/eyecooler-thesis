@@ -172,11 +172,12 @@ def ring_group(pig, sess):
 
 
 def analysis_sets():
-    """(name, keep) for every across-animal summary: primary first, as before, then each
-    group of ANIMAL_GROUPS with more than one animal, then all animals."""
+    """(name, keep) for every across-animal summary: primary first, then each exposure group
+    (ring delivered), then all animals.
+    2026-11-11: the animal groups (Pigs 2-4, Pigs 5-6) are no longer summarized - they
+    duplicated the exposure groups but put Pig 5 S1 (ring about 9.5 C) with the 4 C sessions.
+    Animal_group stays on each row as a label only."""
     return ([(SET_PRIMARY, lambda r: animal_set(r["Pig"], r["Session"]) == "primary")]
-            + [(g, lambda r, g=g: animal_group(r["Pig"]) == g and not excluded(r))
-               for g, ps in ANIMAL_GROUPS.items() if len(ps) > 1]
             + [(g, lambda r, g=g: ring_group(r["Pig"], r["Session"]) == g and not excluded(r))
                for g in (GROUP_WARM, GROUP_COLD)]
             + [(SET_ALL, lambda r: not excluded(r))])
@@ -1284,7 +1285,8 @@ def main(argv=None):
     write_sheet(wb, "Summary excl Pig 1", [r for r in summ if r["Set"] == SET_PRIMARY], note + "Pig 1 EXCLUDED (exploratory).")
     write_sheet(wb, "Summary incl Pig 1", [r for r in summ if r["Set"] == SET_ALL], note + "Pig 1 INCLUDED.")
     write_sheet(wb, "Summary by group", [r for r in summ if r["Set"] not in (SET_PRIMARY, SET_ALL)], note +
-                "Groups of animals and of delivered ring temperature (Set).")
+                "Groups by delivered ring temperature (Set): about 9.5 C = Pigs 2-4 and Pig 5 S1 (old calibration), "
+                "about 4 C = Pig 5 from S2 and Pig 6 (contact calibration).")
     write_sheet(wb, "Restoration", rest, f"Restored when |test eye's own change| <= {RESTORE_K:g} x SD of the "
                 "control eye's change (pooled); Verdict_T_minus_C keeps the earlier test-minus-control rule. Eye check: each eye's own change against the control eyes' usual "
                 "range (amplitudes as % of the eye's own earlier value, times in ms; robust: median +- max(2 x 1.4826 MAD, "
