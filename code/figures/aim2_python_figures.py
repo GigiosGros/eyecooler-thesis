@@ -104,7 +104,7 @@ for ax, site in zip(axs.flat, sites):
     ax.ticklabel_format(axis="y", useOffset=False)
 for ax in axs[:, 0]:
     ax.set_ylabel("Final temperature (°C)", fontsize=7.5)
-fig.supxlabel("Mesh vertices (thousands)", fontsize=7.5)
+fig.supxlabel("Mesh vertices", fontsize=7.5)   # 2026-11-12: ticks already read 20k, 50k, 200k
 axs[0, 0].legend(fontsize=7.5, frameon=False, handlelength=2.2)
 save(fig, "mesh-convergence.png")
 

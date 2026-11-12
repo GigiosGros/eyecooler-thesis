@@ -54,7 +54,7 @@ SET = "Ring about 9.5 C (Pigs 2-4, Pig 5 S1)"      # the group with enough anima
 SHOWN = {1, 2, 3, 4, 5, 6}
 CONTACT_CAL = {5: 2, 6: 1}      # sessions in the ring-about-4-C group
 DURS = [30, 60, 120]
-PIG_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+PIG_COLORS = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e", "#8c564b"]   # 2026-11-12: one color per animal, as COLORS of aim3_invivo_figures.py
 PHASES = [("Pre Jet", "Before cooling", "#1f77b4"), ("Intra Jet", "During cooling", "#d62728"),
           ("Post Jet", "Recovery", "#2ca02c")]
 plt.rcParams.update({"font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8})
@@ -129,7 +129,7 @@ def cooling_effect_figure(eff, out):
           Line2D([], [], marker="o", ls="none", color="0.3", mfc="white", label="Open: control eye"),
           Line2D([], [], marker="o", ls="none", color="0.5", label="Circle: ring about 9.5 °C"),
           Line2D([], [], marker="^", ls="none", color="0.5", label="Triangle: ring about 4 °C"),
-          Line2D([], [], marker="s", ls="none", color="k", label="Mean of all sessions\nand 95% CI")]
+          Line2D([], [], marker="s", ls="none", color="k", label="Mean of animals 2 to 6\nand 95% CI")]
     labels = [x.get_label() for x in h]
     from matplotlib.legend_handler import HandlerTuple
     fig.legend(h, labels, loc="lower center", ncol=4, frameon=False, fontsize=6.5,

@@ -74,7 +74,7 @@ EXPLORATORY = {1}
 
 # Okabe-Ito (colour-blind safe) for the series; animal colours as in the Chapter 4 figures.
 C_HUMAN, C_PIG, C_PERF = "#0072B2", "#E69F00", "#009E73"
-ANIMAL = {2: "#ff7f0e", 3: "#2ca02c", 4: "#d62728", 5: "#9467bd", 6: "#8c564b"}   # tab10, as PIG_COLORS of Chapter 4
+ANIMAL = {2: "#d62728", 3: "#2ca02c", 4: "#9467bd", 5: "#ff7f0e", 6: "#8c564b"}   # 2026-11-12: one color per animal across Chapter 4 and 5 (COLORS of aim3_invivo_figures.py)
 EXPL = "0.55"
 
 plt.rcParams.update({"font.family": "Arial", "font.size": 8.5, "axes.spines.top": False,
