@@ -61,7 +61,14 @@ EYE_CENTRE = {
     (2, 3, "Pre", "Control"): (0.65, 0.55),
     (2, 3, "Post", "Test"): (0.43, 0.56),
     (2, 3, "Post", "Control"): (0.61, 0.58),
+    # 2026-11-12: the four eyes of the baseline figure (read from the frames, centre of the iris)
+    (6, 2, "Pre", "Control"): (0.60, 0.44),
+    (3, 2, "Pre", "Test"): (0.40, 0.57),
+    (5, 3, "Pre", "Test"): (0.40, 0.48),
+    (5, 2, "Pre", "Test"): (0.45, 0.50),
 }
+# 2026-11-12: tighter square crop for the baseline figure, so the eye fills the panel and the skin marks are left out
+CROP_SIDE_FRAC_BASELINE = 0.40
 STAIN_TRIM = (50, 40)          # rows removed at the top (banner) and bottom (grey bar)
 
 
@@ -120,14 +127,14 @@ def _fmt(v):
     return "–" if pd.isna(v) else f"{int(v)}" if float(v).is_integer() else f"{v}"
 
 
-def load_panel(pig, session, test, tp, eye):
+def load_panel(pig, session, test, tp, eye, crop=CROP_SIDE_FRAC):
     f = next(SURF.glob(f"Pig{pig}_S{session}_{'Observation' if test == 'Observation' else 'Staining'}"
                        f"_{tp}_{eye}.*"))
     im = ImageOps.exif_transpose(Image.open(f)).convert("RGB")
     W, H = im.size
     if test == "Observation":
         cx, cy = EYE_CENTRE.get((pig, session, tp, eye), (0.5, 0.5))
-        side = int(CROP_SIDE_FRAC * W)
+        side = int(crop * W)
         x0 = min(max(int(cx * W - side / 2), 0), W - side)
         y0 = min(max(int(cy * H - side / 2), 0), H - side)
         im = im.crop((x0, y0, x0 + side, y0 + side))
@@ -137,12 +144,86 @@ def load_panel(pig, session, test, tp, eye):
     return f, im
 
 
+# 2026-11-12: the figure shows fluorescein staining before cooling, one frame per grade seen at baseline,
+# chosen by me: (animal, session, eye), all "before" frames of record, in order of grade.
+BASELINE_STAINING = [(6, 2, "Control"), (3, 2, "Test"), (5, 3, "Test"), (5, 2, "Test")]
+
+
+def refresh_staining(slots):
+    SURF.mkdir(parents=True, exist_ok=True)
+    origins = {}
+    for pig, session, eye in slots:
+        for test in ("Observation", "Corneal Staining"):
+            name = picks(pig, session)[(test, "Pre", eye)]
+            folder, _ = TESTS[test]
+            src = STUDY / f"Pig {pig}" / SESSIONS[session] / folder / TP_DIR["Pre"] / name
+            if not src.exists():
+                raise SystemExit(f"pick not in the session folder: {src}")
+            dst = SURF / local_name(pig, session, test, "Pre", eye, name)
+            shutil.copy2(src, dst)
+            origins[str(dst.relative_to(THESIS)).replace("\\", "/")] = (
+                str(src) + " (pick of record, Reference/_picks.csv)")
+    old = SRC / "origins.json"
+    merged = json.loads(old.read_text(encoding="utf-8")) if old.exists() else {}
+    merged.update(origins)
+    old.write_text(json.dumps(merged, indent=1), encoding="utf-8")
+
+
+def main_baseline_staining(refresh_inputs):
+    if refresh_inputs:
+        refresh_staining(BASELINE_STAINING)
+    # 2026-11-12 (later): the redness photograph of the same eye at the same time point above each staining frame
+    fig, axes = plt.subplots(2, 4, figsize=(7.2, 3.9), gridspec_kw={"height_ratios": [1, 0.8]})
+    inputs, desc = [], []
+    for c, (pig, session, eye) in enumerate(BASELINE_STAINING):
+        g = grades(pig, session)
+        for r, test in enumerate(("Observation", "Corneal Staining")):
+            f, im = load_panel(pig, session, test, "Pre", eye, crop=CROP_SIDE_FRAC_BASELINE)
+            inputs.append(f)
+            ax = axes[r, c]
+            ax.imshow(im)
+            ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values():
+                sp.set_visible(False)
+            if test == "Observation":
+                ax.set_title(f"Animal {pig}, session {session}\n{eye.lower()} eye, before", fontsize=8.5)
+                txt = f"bulbar {_fmt(g.get(('bulbar', 'Pre', eye)))}, limbal {_fmt(g.get(('limbal', 'Pre', eye)))}"
+            else:
+                txt = f"staining {_fmt(g.get(('staining', 'Pre', eye)))}"
+            ax.text(0.03, 0.03, txt, transform=ax.transAxes, fontsize=7.5, color="white", va="bottom", ha="left",
+                    bbox=dict(boxstyle="round,pad=0.25", fc="black", ec="none", alpha=0.65))
+        desc.append((pig, session, eye, _fmt(g.get(("bulbar", "Pre", eye))), _fmt(g.get(("limbal", "Pre", eye))),
+                     _fmt(g.get(("staining", "Pre", eye)))))
+    axes[0, 0].set_ylabel("Redness", fontsize=8.5)
+    axes[1, 0].set_ylabel("Fluorescein\nstaining", fontsize=8.5)
+    fig.tight_layout(pad=0.4, w_pad=0.3)
+    fig.savefig(OUT, dpi=300, bbox_inches="tight", pad_inches=0.02)
+    plt.close(fig)
+    print("baseline staining panels:", desc)
+    origins_f = SRC / "origins.json"
+    allo = json.loads(origins_f.read_text(encoding="utf-8")) if origins_f.exists() else {}
+    rel = [str(p.relative_to(THESIS)).replace("\\", "/") for p in inputs]
+    origins = {k: allo[k] for k in rel if k in allo}
+    origins["figures/aim3/sources/master_scores.csv"] = allo.get("figures/aim3/sources/master_scores.csv", "")
+    record(__file__, [OUT], inputs + [SCORES], origins=origins,
+           notes="Fluorescein staining before cooling, one frame per baseline grade (frames chosen by me "
+                 "2026-11-12), with the redness photograph of the same eye: " + "; ".join(
+                     f"animal {p} session {s} {e.lower()} eye, bulbar {b}, limbal {l}, staining {st}"
+                     for p, s, e, b, l, st in desc),
+           manifest=FIG3 / "MANIFEST.json")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pig", type=int, default=2)
     ap.add_argument("--session", type=int, default=3)
     ap.add_argument("--refresh", action="store_true")
+    ap.add_argument("--one-session", action="store_true",
+                    help="the earlier 2 x 4 figure of one session (before 2026-11-12)")
     a = ap.parse_args()
+    if not a.one_session:
+        main_baseline_staining(a.refresh)
+        return
     if a.refresh:
         refresh(a.pig, a.session)
     g = grades(a.pig, a.session)

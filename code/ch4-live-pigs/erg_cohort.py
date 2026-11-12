@@ -236,6 +236,10 @@ def b_shape(f, ia, ib):
     """Width (ms) of the main b-wave peak at WIDTH_FRAC of its amplitude (a-wave trough to b-wave
     peak), and the number of peaks above that level. The width stops at the first trough after
     the peak: a later wave that keeps the trace above the level is not part of the peak.
+    2026-11-12: that first trough is the first local minimum after the peak, however shallow. Until
+    then only a trough of PEAK_PROM of the amplitude stopped the width, so a plateau or a second hump
+    just above the level ran the width on to 45-97 ms (42 of 312 traces of the primary set over 40 ms;
+    with this rule 1).
     f = filtered trace on EA.GRID; ia, ib = picks."""
     from scipy.signal import find_peaks
     amp = float(f[ib] - f[ia])
@@ -249,7 +253,9 @@ def b_shape(f, ia, ib):
     mins, _ = find_peaks(-f, prominence=prom)
     after = mins[mins > ib]
     before = mins[(mins < ib) & (mins > ia)]
-    stop_r = int(after[0]) if len(after) else len(f) - 1
+    d = np.diff(f[ib:])
+    turn = np.where((d[:-1] < 0) & (d[1:] >= 0))[0]
+    stop_r = int(ib + turn[0] + 1) if len(turn) else len(f) - 1
     stop_l = int(before[-1]) if len(before) else ia
     i = ib
     while i > stop_l and f[i - 1] >= lev:
@@ -288,6 +294,10 @@ def metrics(rec, eye, flash, sess_name, overrides):
     else:
         a_amp, b_amp = m["a_amp"], m["b_amp"]
     op = (rec.get("ops") or {}).get((eye, flash))       # flashes 8 and 25 only (erg_all.OP_FLASHES)
+    if op is not None and hand:
+        # 2026-11-12: the OP window is bounded by the picks; with a hand-corrected pick it is rebuilt from
+        # the hand pick (it was still built from the automatic one)
+        op = EA.op_rewindow(op, at, bt)
     width, peaks = b_shape(f, int(np.argmin(np.abs(EA.GRID - at))), int(np.argmin(np.abs(EA.GRID - bt))))
     return dict(a_amp=-a_amp, a_t=at, b_amp=b_amp, b_t=bt, b_width=width, b_peaks=peaks, ok=bool(m.get("ok", True)),
                 hand="+".join(hand), op_amp=(op or {}).get("sum"), op=op)
