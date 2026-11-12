@@ -35,13 +35,18 @@ OUT = FIG3 / "appendix_histology"
 STUDY = Path(os.environ.get("LIVE_PIG_STUDY", THESIS / "data" / "Live Pigs Safety Study"))
 SLIDE = 5
 SLIDE_OF = {1: 10}                  # animal -> slide, where slide 5 does not exist
+SLIDE_OF_EYE = {(3, "Test"): 10}     # 2026-11-12: slide chosen by me for one eye (animal 3 test eye: slide 10)
 SUFFIX_OF = {(1, "Test"): "_200X_FullEye", (1, "Control"): "_200X_HalfEye"}   # file-name suffix of those scans
 MAX_SIDE = 3000
 Image.MAX_IMAGE_PIXELS = None       # the slide scans are about 350 Mpx
 
 
+def slide(pig, eye):
+    return SLIDE_OF_EYE.get((pig, eye), SLIDE_OF.get(pig, SLIDE))
+
+
 def name(pig, eye):
-    return f"Pig {pig} {eye}_{SLIDE_OF.get(pig, SLIDE)}{SUFFIX_OF.get((pig, eye), '')}.jpg"
+    return f"Pig {pig} {eye}_{slide(pig, eye)}{SUFFIX_OF.get((pig, eye), '')}.jpg"
 
 
 def study_file(pig, eye):
@@ -84,7 +89,8 @@ def main():
         for ax, title in zip(axes, ("Test eye", "Control eye")):
             b = ax.get_position()
             fig.text((b.x0 + b.x1) / 2, 0.96, title, ha="center", va="center", fontsize=12)
-        out = OUT / f"Pig{pig}_slide{SLIDE_OF.get(pig, SLIDE)}.jpg"
+        st, sc = slide(pig, "Test"), slide(pig, "Control")
+        out = OUT / (f"Pig{pig}_slide{st}.jpg" if st == sc else f"Pig{pig}_test{st}_control{sc}.jpg")
         fig.savefig(out, dpi=300, pil_kwargs={"quality": 90})
         plt.close(fig)
         outs.append(out)

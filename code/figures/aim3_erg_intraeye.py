@@ -138,7 +138,7 @@ def effects_table(d, iop, summ):
     pressure). The CI is given on the test-against-control difference with the ring at about 9.5 C; the ring-about-4-C
     rows (one or two sessions) give the means only. p_Holm only for the primary measures at about 9.5 C."""
     head = "% Written by code/figures/aim3_erg_intraeye.py; do not edit."
-    colspec = "L{2.4cm}R{0.6cm}L{1.8cm}L{1.8cm}L{4.0cm}R{1.0cm}R{0.9cm}"   # 2026-11-08: g column added
+    colspec = "L{2.4cm}R{0.8cm}L{1.8cm}L{1.8cm}L{3.8cm}R{1.0cm}R{0.9cm}"   # 2026-11-08: g column added; 2026-11-12: Min column 0.8 cm (bold "Min" ran into the next header)
     th = ("\\textbf{Measure} & \\textbf{Min} & \\textbf{Test eye} & \\textbf{Control eye} & "
           "\\textbf{Test against control} & \\textit{p}\\textsubscript{Holm} & \\textit{g} \\\\")
     # 2026-11-08: one block, both ring temperatures together (animals 2-6); the ring-level split stays in
