@@ -54,26 +54,28 @@ def main():
     on = {k: np.interp(grid, v.T_C.to_numpy(), v.q_Wg.to_numpy()) for k, v in data.items()}
     water = on["Distilled water"]
 
-    plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11})
-    fig, (a, b) = plt.subplots(1, 2, figsize=(10, 4))
+    # 2026-11-11: drawn at the printed width, 6.0 in, for \includegraphics[width=\textwidth] (it was 10 in
+    # wide at font 11/9 and included at 0.6\textwidth, i.e. 3.2-4.0 pt in print); text 8 pt, legends 7 pt.
+    plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 8, "axes.titlesize": 8})
+    fig, (a, b) = plt.subplots(1, 2, figsize=(6.0, 2.6))
     for _, label, color in FILES:
         d = data[label]
-        a.plot(d.T_C, d.q_Wg, color=color, lw=2, label=label)
+        a.plot(d.T_C, d.q_Wg, color=color, lw=1.2, label=label)
     a.set_xlabel("Temperature (°C)")
-    a.set_ylabel("Normalized heat flow (W/g), endothermic down")
+    a.set_ylabel("Normalized heat flow (W/g),\nendothermic down")
     a.set_title("A  Heat flow during a 10 °C/min ramp", loc="left", fontweight="bold")
-    a.legend(frameon=False, loc="lower left")
+    a.legend(frameon=False, loc="lower left", fontsize=7)
     for _, label, color in FILES[1:]:
-        b.plot(grid, on[label] / water, color=color, lw=2, label=f"{label}, measured")
-    b.axhline(CP_RATIO_PG, color=FILES[2][2], ls="--", lw=1.2, label="Propylene glycol, tabulated $c_p$ ratio")
+        b.plot(grid, on[label] / water, color=color, lw=1.2, label=f"{label}, measured")
+    b.axhline(CP_RATIO_PG, color=FILES[2][2], ls="--", lw=0.9, label="Propylene glycol, tabulated $c_p$ ratio")
     b.set_ylim(0, 1)
     b.set_xlabel("Temperature (°C)")
     b.set_ylabel("Ratio to distilled water")
     b.set_title("B  Heat absorbed relative to water", loc="left", fontweight="bold")
-    b.legend(frameon=False, loc="lower left", fontsize=9)
+    b.legend(frameon=False, loc="lower left", fontsize=7)
     for ax in (a, b):
         ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
+    fig.tight_layout(pad=0.3)
     path = OUT / "dsc_coolants.png"
     fig.savefig(path, dpi=300)
     plt.close(fig)

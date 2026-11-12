@@ -39,6 +39,8 @@ def fmt_for(name):
     n = str(name).lower()
     if re.search(r"(^|_|\s)p(_|\s|$)", n) or n.startswith("p_"):
         return "0.000", 3
+    if n.startswith("g_") or n == "g" or n.startswith("g "):      # effect size (2026-11-11)
+        return "0.00", 2
     if "fraction" in n:
         return "0%", 2
     if re.search(r"(^|_)(n|count|pigs?|session_no|duration_min|repeat|sweeps_(kept|total)|n_pooled|"

@@ -3,7 +3,10 @@
 Same drawing as aim2_model_figures.py, aim2_temperature_field.py and aim2_retina_profile.py
 (blocks copied, styling unchanged), with the input tables replaced by those of
 aim2_python_corrected.py (figures/aim2/sources/data/python/corrected/). Plotting only.
-The mesh figure stays on the runs of the same cases as COMSOL (aim2_python_results.py).
+Since 2026-11-11 the mesh figure, the temperature field and the retina profile come from the corrected-set-up runs
+of 2026-11-11 (aim2_python_reruns.py: mesh_steps.csv, mesh_nodes.csv, plane_fields_python_35min.npz,
+retina_profile_python_v*.csv), on the program's own mesh: no COMSOL solution, node set or plane is read. They are
+drawn at the printed width (6.0 in; retina profile 5.4 in) so that the smallest text prints at 7 pt or more.
 
 Figures: mesh-convergence, material-effectiveness, required-ring-temperature, model-vs-exvivo,
 model-time-course, model-vs-exvivo-time, temperature-field, retina-temperature-profile,
@@ -12,6 +15,7 @@ on COMSOL's data: heat-exchanger-mesh-convergence. paired-differences has no mod
 
 Run:  python code/figures/aim2_python_results.py
       python code/figures/aim2_python_corrected.py
+      python code/figures/aim2_python_reruns.py
       python code/figures/aim2_python_figures.py
 Every run updates figures/aim2/MANIFEST.json.
 """
@@ -62,18 +66,19 @@ def save(fig, name):
     print("wrote", name)
 
 
-# 1 ---- mesh convergence (values of the program on COMSOL's three meshes)
-USED.append(PY.parent / "mesh_steps.csv")
-g = pd.read_csv(PY.parent / "mesh_steps.csv")
+# 1 ---- mesh convergence: the program in the corrected set-up on COMSOL's three meshes (runs of 2026-11-11;
+# the COMSOL-set-up runs, data/python/mesh_steps.csv, are no longer drawn)
+USED.append(PY / "mesh_steps.csv")
+g = pd.read_csv(PY / "mesh_steps.csv")
 g = g[g.source == "python"]
-# vertex counts of the meshes as the program solves them (air and module layer removed), not COMSOL's counts
-nodp = PY.parent / "mesh_nodes_without_air.csv"
+# vertex counts of the meshes as the program solves them (air and module layer removed)
+nodp = PY / "mesh_nodes.csv"
 USED.append(nodp)
 nodes = {}
 for _, r in pd.read_csv(nodp).iterrows():
     nodes.setdefault(r.variant, {})[r.mesh] = r.vertices
 sites = ORDER + ["SCR"]
-fig, axs = plt.subplots(2, 4, figsize=(10, 5), constrained_layout=True)
+fig, axs = plt.subplots(2, 4, figsize=(6.0, 3.5), constrained_layout=True)
 Y_HALF_SPAN = 0.5
 for ax, site in zip(axs.flat, sites):
     seen = []
@@ -82,26 +87,25 @@ for ax, site in zip(axs.flat, sites):
         y = [r.T_coarser, r.T_coarse, r.T_finest]
         x = [nodes[v][m] for m in ("Coarser", "Coarse", "Normal")]
         mk, ls = DES_M[v]
-        ax.plot(x, y, marker=mk, ls=ls, color=DES_C[v], ms=4, lw=1.2, label=v.lower())
-        ax.errorbar(x[-1], y[-1], yerr=abs(y[-1] - y[-2]), color=DES_C[v], capsize=2.5, lw=1, fmt="none")
+        ax.plot(x, y, marker=mk, ls=ls, color=DES_C[v], ms=3, lw=1.0, label=v.lower())
+        ax.errorbar(x[-1], y[-1], yerr=abs(y[-1] - y[-2]), color=DES_C[v], capsize=2, lw=0.9, fmt="none")
         seen += list(y) + [y[-1] - abs(y[-1] - y[-2]), y[-1] + abs(y[-1] - y[-2])]
-    ax.set_title(NAME.get(site, site), color=SITE_C.get(site, SITE_C["Ring"]), fontsize=9.5, fontweight="bold")
+    ax.set_title(NAME.get(site, site), color=SITE_C.get(site, SITE_C["Ring"]), fontsize=7.5, fontweight="bold")
     ax.set_xscale("log")
     ax.set_xlim(1.2e4, 2.5e5)
-    ax.set_xticks([2e4, 5e4, 1e5, 2e5])
+    ax.set_xticks([2e4, 5e4, 2e5])
     ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda val, pos: f"{val / 1000:.0f}k"))
     ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-    ax.tick_params(axis="both", labelsize=8)
+    ax.tick_params(axis="both", labelsize=7.5)
     mid = 0.5 * (min(seen) + max(seen))
     assert max(seen) - min(seen) <= 2 * Y_HALF_SPAN, (site, min(seen), max(seen))
     ax.set_ylim(mid - Y_HALF_SPAN, mid + Y_HALF_SPAN)
     ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(0.25))
     ax.ticklabel_format(axis="y", useOffset=False)
 for ax in axs[:, 0]:
-    ax.set_ylabel("Final temperature (°C)", fontsize=9)
-for ax in axs[1]:
-    ax.set_xlabel("Mesh vertices (thousands)", fontsize=9)
-axs[0, 0].legend(fontsize=8, frameon=False)
+    ax.set_ylabel("Final temperature (°C)", fontsize=7.5)
+fig.supxlabel("Mesh vertices (thousands)", fontsize=7.5)
+axs[0, 0].legend(fontsize=7.5, frameon=False, handlelength=2.2)
 save(fig, "mesh-convergence.png")
 
 # 3 ---- material
@@ -241,11 +245,11 @@ axs[0, 0].set_ylim(0, 40)
 axs[0, 0].set_xlim(0, 20)
 save(fig, "model-vs-exvivo-time.png")
 
-# temperature field (module layer not drawn; see aim2_python_results.py)
-d = np.load(PY / "plane_fields_35min.npz")
-USED.append(PY / "plane_fields_35min.npz")
+# temperature field: plane of symmetry of the program's own mesh, corrected set-up (no air, no module layer), 35 min
+d = np.load(PY / "plane_fields_python_35min.npz")
+USED.append(PY / "plane_fields_python_35min.npz")
 T_LO, T_HI, STEP = 4.0, 37.0, 2.0
-fig, axs = plt.subplots(1, 3, figsize=(7.4, 5.3), sharey=True, constrained_layout=True)
+fig, axs = plt.subplots(1, 3, figsize=(6.0, 4.3), sharey=True, constrained_layout=True)
 levels = np.arange(T_LO + STEP, T_HI, STEP)
 for ax, letter, v in zip(axs, "ABC", ("v1", "v2", "v3")):
     x, z, tris, T, dom = (d[f"{v}_{k}"] for k in ("x", "z", "tris", "T", "dom"))
@@ -266,18 +270,20 @@ for ax, letter, v in zip(axs, "ABC", ("v1", "v2", "v3")):
     seg = np.stack([np.stack([x[i0], z[i0]], 1), np.stack([x[i1], z[i1]], 1)], 1)
     ax.add_collection(LineCollection(seg, colors="black", linewidths=0.45, alpha=0.8))
     ax.set_aspect("equal")
-    ax.set_title(f"({letter}) {v}", loc="left", fontsize=10)
-    ax.set_xlabel("x (mm)", fontsize=9)
-axs[0].set_ylabel("z (mm)", fontsize=9)
+    ax.set_title(f"({letter}) {v}", loc="left", fontsize=8.5)
+    ax.set_xlabel("x (mm)", fontsize=8)
+    ax.tick_params(labelsize=7.5)
+axs[0].set_ylabel("z (mm)", fontsize=8)
 cb = fig.colorbar(im, ax=axs, shrink=0.8, pad=0.02, ticks=np.arange(5, 38, 5))
-cb.set_label("Temperature (°C)", fontsize=9)
+cb.set_label("Temperature (°C)", fontsize=8)
+cb.ax.tick_params(labelsize=7.5)
 save(fig, "temperature-field.png")
 
 
 # retina profile
 def load(v):
-    USED.append(PY / f"retina_profile_{v}.csv")
-    r = pd.read_csv(PY / f"retina_profile_{v}.csv")
+    USED.append(PY / f"retina_profile_python_{v}.csv")
+    r = pd.read_csv(PY / f"retina_profile_python_{v}.csv")
     r["s"] = r.arc_mm - r.arc_mm[int(r.z_mm.values.argmin())]
     return r
 
@@ -286,7 +292,7 @@ R = {v: load(v) for v in ("v1", "v2", "v3")}
 v1 = R["v1"]
 TIMES = {0: ("Before cooling", "#8a8a8a", "-"), 35: ("35 min", "#08519c", "-"), 15: ("15 min", "#6baed6", (0, (4, 3)))}
 RC = {"v2": ("#D55E00", "-"), "v3": ("#009E73", (0, (5, 2)))}
-fig, (a, b) = plt.subplots(2, 1, figsize=(6.6, 6.0), sharex=True, constrained_layout=True,
+fig, (a, b) = plt.subplots(2, 1, figsize=(5.4, 4.9), sharex=True, constrained_layout=True,
                            gridspec_kw=dict(height_ratios=[2.2, 1]))
 for t, (label, color, ls) in TIMES.items():
     a.plot(v1.s, v1[f"T_python_{t}min_C"], color=color, ls=ls, lw=2.0, label=label)
@@ -353,4 +359,10 @@ save(fig, "energy-split.png")
 
 record(__file__, WRITTEN, sorted(set(USED)),
        origins={"python": "aim2_python_corrected.py from the tables of 2026-10-13 (original/new_runs); see sources/data/python/corrected/inputs_manifest.json"},
-       notes="Eye-model figures from the corrected runs of the Python program, tag scr-heat-replica-v1.1.")
+       notes="Eye-model figures from the corrected runs of the Python program, tag scr-heat-replica-v1.1. Since 2026-11-11 "
+             "mesh-convergence, temperature-field and retina-temperature-profile come from the corrected-set-up runs of "
+             "2026-11-11 (aim2_python_reruns.py: corrected/mesh_steps.csv, mesh_nodes.csv, plane_fields_python_35min.npz, "
+             "retina_profile_python_v*.csv; program's own mesh, no COMSOL solution or node set read) and are drawn at the "
+             "printed width (smallest text >= 7 pt). Superseded, kept unused: data/python/mesh_steps.csv and "
+             "mesh_nodes_without_air.csv (COMSOL set-up), corrected/plane_fields_35min.npz and corrected/retina_profile_v*.csv "
+             "(COMSOL plane and nodes; equal to the new ones within 2e-6 C); old PNGs in figures/aim2/_superseded_2026-11-11/.")

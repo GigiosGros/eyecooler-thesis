@@ -33,6 +33,8 @@ if "--refresh" in sys.argv or not all((SNAP / n).exists() for n in NAMES):
     for n in list(NAMES) + ["MANIFEST.json", "sizes.csv"]:
         shutil.copy2(ORIGIN / n, SNAP / n)
 for src, dst in NAMES.items():
+    if src == "hx-boundaries.png":
+        continue                         # 2026-11-11: Figure D.2 is now the Python set-up picture (below)
     shutil.copy2(SNAP / src, FIG / dst)
     record(__file__, [FIG / dst], [SNAP / src, SNAP / "MANIFEST.json"],
            origins={src: "scr-heat-replica/results/figures_2026-10-12/model_setup_comsol_thesis/" + src,
@@ -54,3 +56,20 @@ for src, dst in (("eye-geometry.png", "model-domains.png"), ("eye-boundaries.png
            origins={src: "scr-heat-replica/results/figures_2026-10-31/model_setup_solved/" + src},
            notes="copied unchanged; corrected Python set-up, drawn by scr-heat-replica/dev/make_model_figures_solved.py")
     print("wrote", dst)
+
+# 2026-11-11: the boundary conditions of the heat exchangers as the Python runs of Chapter 3 set them
+# (sweep W13: heat on the annulus of radius 7 to 13 mm, the rest of the module plane an outer wall), drawn by
+# scr-heat-replica/dev/make_hx_boundaries_python.py (6.0 in wide, legend 7.5 pt). Replaces the COMSOL picture
+# hx-boundaries.png, which showed COMSOL's heated faces.
+ORIGIN_HX = ORIGIN.parents[1] / "figures_2026-11-11" / "hx_boundaries_python"
+for n in ("hx-boundaries.png", "MANIFEST.json"):
+    if "--refresh" in sys.argv or not (SNAP_PY / ("hx_" + n if n == "MANIFEST.json" else n)).exists():
+        shutil.copy2(ORIGIN_HX / n, SNAP_PY / ("hx_" + n if n == "MANIFEST.json" else n))
+shutil.copy2(SNAP_PY / "hx-boundaries.png", FIG / "heat-exchanger-boundary-conditions.png")
+record(__file__, [FIG / "heat-exchanger-boundary-conditions.png"], [SNAP_PY / "hx-boundaries.png", SNAP_PY / "hx_MANIFEST.json"],
+       origins={"hx-boundaries.png": "scr-heat-replica/results/figures_2026-11-11/hx_boundaries_python/hx-boundaries.png",
+                "hx_MANIFEST.json": "scr-heat-replica/results/figures_2026-11-11/hx_boundaries_python/MANIFEST.json"},
+       notes="copied unchanged; Python set-up of the heat-exchanger runs (heated annulus 7-13 mm, module_plane air, mesh normal), "
+             "drawn by scr-heat-replica/dev/make_hx_boundaries_python.py. Superseded COMSOL version kept in "
+             "figures/aim2/_superseded_2026-11-11/heat-exchanger-boundary-conditions.png")
+print("wrote heat-exchanger-boundary-conditions.png")

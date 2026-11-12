@@ -71,7 +71,10 @@ def main():
     if ap.parse_args().refresh:
         refresh()
     regions = list(REGIONS["Test"])
-    fig, axs = plt.subplots(2, 4, figsize=(12, 6.4), gridspec_kw={"width_ratios": [1.25, 1, 1, 1]})
+    # 2026-11-11: drawn at the printed width (6.0 in, included at width=\textwidth) with text of 8 pt; it was
+    # 12 in wide (titles 10-11 pt, scale labels 8 pt, i.e. 4-5.5 pt in print). Same crops and layout; dpi raised
+    # so the PNG keeps its 3000 px width.
+    fig, axs = plt.subplots(2, 4, figsize=(6.0, 3.2), gridspec_kw={"width_ratios": [1.25, 1, 1, 1]})
     ins = []
     for row, eye in enumerate(("Test", "Control")):
         ov = OVR / f"Pig {PIG} {eye}_{SLIDE}.jpg"
@@ -80,12 +83,12 @@ def main():
         ax = axs[row, 0]
         ax.imshow(o)
         ax.set_axis_off()
-        ax.set_title(f"{eye} eye", fontsize=11, loc="left")
+        ax.set_title(f"{eye} eye", fontsize=8.5, loc="left")
         for k, region in enumerate(regions):
             fx, fy = REGIONS[eye][region]
             s = SIDE_MM * 910 * o.size[0] / FULL_W[eye]
-            ax.add_patch(Rectangle((fx * o.size[0] - s / 2, fy * o.size[1] - s / 2), s, s, fill=False, ec="black", lw=1))
-            ax.text(fx * o.size[0] + s / 2 + 15, fy * o.size[1], "abc"[k], fontsize=10, va="center", fontweight="bold")
+            ax.add_patch(Rectangle((fx * o.size[0] - s / 2, fy * o.size[1] - s / 2), s, s, fill=False, ec="black", lw=0.6))
+            ax.text(fx * o.size[0] + s / 2 + 15, fy * o.size[1], "abc"[k], fontsize=8, va="center", fontweight="bold")
             c = CROPS / crop_name(eye, region)
             ins.append(c)
             a = axs[row, k + 1]
@@ -93,14 +96,14 @@ def main():
             a.imshow(img)
             a.set_axis_off()
             if row == 0:
-                a.set_title(f"({'abc'[k]}) {region}", fontsize=10)
+                a.set_title(f"({'abc'[k]}) {region}", fontsize=8)
             bar = 0.2 * PX_PER_MM          # 200 um
             y0 = img.size[1] * 0.93
-            a.plot([img.size[0] * 0.95 - bar, img.size[0] * 0.95], [y0, y0], color="black", lw=3)
-            a.text(img.size[0] * 0.95 - bar / 2, y0 - img.size[1] * 0.03, "200 µm", ha="center", va="bottom", fontsize=8)
-    fig.tight_layout()
+            a.plot([img.size[0] * 0.95 - bar, img.size[0] * 0.95], [y0, y0], color="black", lw=1.6)
+            a.text(img.size[0] * 0.95, y0 - img.size[1] * 0.03, "200 µm", ha="right", va="bottom", fontsize=8)
+    fig.tight_layout(pad=0.3)
     out = FIG3 / "histology.png"
-    fig.savefig(out, dpi=250)
+    fig.savefig(out, dpi=500)
     plt.close(fig)
     record(__file__, [out], ins, origins={f"Pig {PIG} {e}_{SLIDE}.jpg": str(scan(e)) for e in ("Test", "Control")},
            manifest=FIG3 / "MANIFEST.json")

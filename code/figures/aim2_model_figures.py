@@ -1,7 +1,12 @@
 """Chapter 3 result figures, drawn from the analysis packages' result tables.
 
-Figures: mesh-convergence, paired-differences, material-effectiveness, energy-split,
-required-ring-temperature, model-vs-exvivo, heat-exchanger-performance (Figs 3.6, 3.8-3.13).
+Figures used in the thesis: paired-differences (Fig 3.7). The script also draws the COMSOL
+versions of mesh-convergence, material-effectiveness, energy-split, required-ring-temperature,
+model-vs-exvivo, model-time-course, model-vs-exvivo-time and heat-exchanger-performance; the
+thesis takes those from aim2_python_figures.py and aim2_python_hx.py. Since 2026-11-11 the
+script does NOT write them (it skips every name in THESIS_FROM_OTHER, and any figure that
+MANIFEST.json credits to another script) unless run with --force, so the run order no longer
+matters. Not in the thesis, still written: energy-split-all, heat-exchanger-mesh-convergence.
 
 Inputs are SNAPSHOTS of the packages' result CSVs, kept in figures/aim2/sources/data/:
   model/   <- 03 - Experiments & Data/Analysis Code/thesis-model-analysis/results/
@@ -30,7 +35,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
-from provenance import FIG, SOURCES, record  # noqa: E402
+from provenance import FIG, SOURCES, record, written_by_other  # noqa: E402
 
 BOX = FIG.parents[4]  # .../Eye Cooler
 PKG_MODEL = BOX / "03 - Experiments & Data" / "Analysis Code" / "thesis-model-analysis" / "results"
@@ -125,9 +130,21 @@ DES_C = {"V1": "#2b4c7e", "V2": "#d9822b", "V3": "#5a9e6f"}
 DES_M = {"V1": ("o", "-"), "V2": ("s", "--"), "V3": ("^", ":")}
 
 WRITTEN = []
+# The thesis prints these from aim2_python_figures.py / aim2_python_hx.py (corrected Python runs);
+# the versions drawn here from the COMSOL tables are superseded and must not overwrite them.
+THESIS_FROM_OTHER = {"mesh-convergence.png", "material-effectiveness.png", "energy-split.png",
+                     "required-ring-temperature.png", "model-vs-exvivo.png", "model-time-course.png",
+                     "model-vs-exvivo-time.png", "heat-exchanger-performance.png"}
+FORCE = "--force" in sys.argv
 
 
 def save(fig, name):
+    other = written_by_other(name, __file__)
+    if not FORCE and (name in THESIS_FROM_OTHER or other):
+        plt.close(fig)
+        print(f"skipped {name}: the thesis uses the version drawn by "
+              f"{other or 'aim2_python_figures.py / aim2_python_hx.py'} (use --force to overwrite)")
+        return
     dst = FIG / name
     fig.savefig(dst, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -281,7 +298,8 @@ for ax in axs:
     ax.legend(frameon=False, fontsize=9)
 save(fig, "material-effectiveness.png")
 
-# 4 ---- energy split (full device, J over 35 min) -- two versions; the thesis uses A:
+# 4 ---- energy split (full device, J over 35 min) from the COMSOL tables; the thesis uses the version
+#   drawn by aim2_python_figures.py, so energy-split.png is skipped here (see save()):
 #   energy-split.png      A: configurations whose energy balance did not close are hatched,
 #                            eye share printed only where it closed
 #   energy-split-all.png  B: all nine drawn alike, eye share printed on every bar

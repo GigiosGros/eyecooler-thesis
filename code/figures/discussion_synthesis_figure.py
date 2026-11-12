@@ -3,12 +3,13 @@
 Output (figures/discussion/):
   discussion-synthesis.png        (A) ex vivo, Aim 1: cooling at five sites in human donor
                                   and fresh porcine eyes (original ring);
-                                  (B) model, Aim 2: the same sites in the model, without
-                                  perfusion (enucleated eye in the 37 C oil bath) and with
-                                  perfusion (human eye in the orbit), beside the human donor
-                                  eyes; (C) in vivo, Aim 3: ring hold temperature of each
-                                  session, and (D) b-wave implicit-time delay (test minus
-                                  control eye, 25 cd s/m2 flash), by cooling duration
+                                  (B) model, Aim 2: the same sites in the perfused model
+                                  (human eye in the orbit), beside the human donor eyes
+                                  (2026-11-11: the bath-model bars removed);
+                                  (C) in vivo, Aim 3: ring hold temperature of each
+                                  session, and (D) change of b-wave implicit time from
+                                  baseline, test minus control eye (25 cd s/m2 flash),
+                                  by session length
   discussion_synthesis_values.csv every plotted number, with its source file and row
   MANIFEST.json                   provenance (provenance.record)
 
@@ -21,11 +22,8 @@ except reading and selecting rows; SD and n are taken as stored):
                                      behind Figure 3.x model-vs-exvivo; column "dT model (C)",
                                      group "Human Fresh Aluminum Original", perfused corrected
                                      Python model v1, eye at rest before cooling, read at 35 min)
-  replica_exvivo_compare_all.csv  <- scr-heat-replica/results/figures_2026-10-22/exvivo_original/
-                                     exvivo_compare_all.csv (Section 3.3 "Model versus Ex-Vivo
-                                     Measurements": case F1_v1_Al_exvivo, oil coefficient
-                                     30 W m-2 K-1 assumed in advance, no perfusion; quantity
-                                     "cooling", column "model")
+  (replica_exvivo_compare_all.csv, the bath model, is no longer read: 2026-11-11; the
+   stored copy in sources/ is kept)
   ring_temperature_summary.csv    <- figures/aim3/ring_temperature_summary.csv (hold_mean_C)
   erg_cohort_cooling_summary.csv  <- figures/aim3/sources/erg/erg_cohort_cooling_summary.csv
                                      (Cooling (Intra Jet - Pre Jet), flash 25, b_t: per-animal
@@ -59,8 +57,6 @@ ORIGINS = {
     "exvivo_all_groups_summary.csv": CODE / "thesis-analysis" / "results" / "02_groups" / "all_groups_summary.csv",
     "model_vs_exvivo.csv": THESIS / "figures" / "aim2" / "sources" / "data" / "python" / "corrected"
     / "model_vs_exvivo.csv",
-    "replica_exvivo_compare_all.csv": CODE / "scr-heat-replica" / "results" / "figures_2026-10-22"
-    / "exvivo_original" / "exvivo_compare_all.csv",
     "ring_temperature_summary.csv": THESIS / "figures" / "aim3" / "ring_temperature_summary.csv",
     "erg_cohort_cooling_summary.csv": THESIS / "figures" / "aim3" / "sources" / "erg"
     / "erg_cohort_cooling_summary.csv",
@@ -71,14 +67,13 @@ SITES = ["Anterior sclera", "Equatorial sclera", "Vitreous", "Posterior sclera",
 NAME_EXVIVO = dict(zip(SITES, ["Anterior Sclera", "Equatorial Sclera", "Vitreous", "Posterior Sclera", "Optic Nerve"]))
 NAME_MODEL = dict(zip(SITES, ["Anterior Sclera", "Equatorial Sclera", "Vitreous Humor", "Posterior Sclera",
                               "Optic Nerve Head"]))
-NAME_REPLICA = NAME_EXVIVO
 DURATIONS = [30, 60, 120]
 SESSION_OF = {30: "1", 60: "2", 120: "3"}
 PIGS = [1, 2, 3, 4, 5, 6]  # 2026-11-08: both ring temperatures, as the Chapter 4 main results
 EXPLORATORY = {1}
 
 # Okabe-Ito (colour-blind safe) for the series; animal colours as in the Chapter 4 figures.
-C_HUMAN, C_PIG, C_BATH, C_PERF = "#0072B2", "#E69F00", "#CC79A7", "#009E73"
+C_HUMAN, C_PIG, C_PERF = "#0072B2", "#E69F00", "#009E73"
 ANIMAL = {2: "#ff7f0e", 3: "#2ca02c", 4: "#d62728", 5: "#9467bd", 6: "#8c564b"}   # tab10, as PIG_COLORS of Chapter 4
 EXPL = "0.55"
 
@@ -129,16 +124,6 @@ def main():
         assert abs(float(r[0]["dT exp (C)"]) - human[s][0]) < 1e-9, s
         values.append(("B", "model, perfused eye", s, "", perf[s], "", "", "model_vs_exvivo.csv",
                        f"Human Fresh Aluminum Original/{NAME_MODEL[s]}: dT model (C)"))
-    rp = rows("replica_exvivo_compare_all.csv")
-    bath = {}
-    for s in SITES:
-        r = [x for x in rp if x["case"] == "F1_v1_Al_exvivo" and x["row_type"] == "site"
-             and x["site"] == NAME_REPLICA[s] and x["quantity"] == "cooling"]
-        assert len(r) == 1 and float(r[0]["h_oil"]) == 30.0 and r[0]["choroid_perfusion"] == "False", s
-        bath[s] = float(r[0]["model"])
-        assert abs(float(r[0]["measured_mean"]) - human[s][0]) < 1e-9, s
-        values.append(("B", "model, eye in the bath without perfusion", s, "", bath[s], "", "",
-                       "replica_exvivo_compare_all.csv", f"F1_v1_Al_exvivo/{NAME_REPLICA[s]}/cooling: model"))
 
     # ---------------------------------------------------------------- (C) in vivo
     rt = rows("ring_temperature_summary.csv")
@@ -180,19 +165,16 @@ def main():
                 yerr=[series[s][1] for s in SITES], error_kw={"lw": 0.8, "capsize": 2})
     axA.set_title("(A) Ex vivo, Aim 1", loc="left", fontsize=9.5, fontweight="bold")
     axA.legend(handles=[Patch(color=C_HUMAN, label="Human donor eyes"), Patch(color=C_PIG, label="Fresh porcine eyes")],
-               frameon=False, fontsize=7.5, loc="upper right")
-    w3 = 0.27
-    axB.bar([x - w3 for x in xs], [human[s][0] for s in SITES], w3, facecolor="white", edgecolor=C_HUMAN, lw=1.0,
+               frameon=False, fontsize=7.8, loc="upper right")
+    axB.bar([x - w / 2 for x in xs], [human[s][0] for s in SITES], w, facecolor="white", edgecolor=C_HUMAN, lw=1.0,
             yerr=[human[s][1] for s in SITES], error_kw={"lw": 0.8, "capsize": 2, "ecolor": C_HUMAN})
-    axB.bar(list(xs), [bath[s] for s in SITES], w3, color=C_BATH)
-    axB.bar([x + w3 for x in xs], [perf[s] for s in SITES], w3, color=C_PERF)
+    axB.bar([x + w / 2 for x in xs], [perf[s] for s in SITES], w, color=C_PERF)
     axB.set_title("(B) Model, Aim 2", loc="left", fontsize=9.5, fontweight="bold")
     axB.legend(handles=[Patch(facecolor="white", edgecolor=C_HUMAN, label="Human donor eyes (as in A)"),
-                        Patch(color=C_BATH, label="Model, in the bath, no perfusion"),
                         Patch(color=C_PERF, label="Model, perfused eye")],
-               frameon=False, fontsize=7.5, loc="upper right")
+               frameon=False, fontsize=7.8, loc="upper right")
     for ax in (axA, axB):
-        ax.set_xticks(list(xs), labels, fontsize=7.5)
+        ax.set_xticks(list(xs), labels, fontsize=7.8)
         ax.set_ylabel("Cooling, fall from the start (°C)")
         ax.set_ylim(0, 31)
 
@@ -206,7 +188,7 @@ def main():
             axC1.plot([d + jit for d, _ in pts], [v for _, v in pts], "o", color=ANIMAL[p], ms=4.5)
     for sp in (9.5, 4.0):
         axC1.axhline(sp, color="0.3", ls=":", lw=0.8)
-        axC1.text(12, sp + 0.1, "set point", fontsize=7, color="0.3", ha="left", va="bottom")
+        axC1.text(12, sp + 0.1, "set point", fontsize=7.8, color="0.3", ha="left", va="bottom")
     axC1.set_ylim(3, 11)
     axC1.set_ylabel("Ring hold temperature (°C)")
     axC1.set_title("(C) In vivo, Aim 3: ring", loc="left", fontsize=9.5, fontweight="bold")
@@ -221,17 +203,18 @@ def main():
             axC2.plot([d + jit for d, _ in pts], [v for _, v in pts], "o", color=ANIMAL[p], ms=4.5)
     axC2.axhline(0, color="0.3", lw=0.6)
     axC2.set_ylim(-1, 9)
-    axC2.set_ylabel("b-wave delay, cooled − fellow eye (ms)")
+    # 2026-11-11: each value is a difference of changes from the Jet baseline, not a plain delay
+    axC2.set_ylabel("Difference between the eyes in the change\nof b-wave implicit time from baseline,\ntest − control (ms)")
     axC2.set_title("(D) In vivo, Aim 3: ERG", loc="left", fontsize=9.5, fontweight="bold")
     for ax in (axC1, axC2):
         ax.set_xticks(DURATIONS, ["30", "60", "120"])
         ax.set_xlim(10, 140)
-        ax.set_xlabel("Cooling duration (min)")
+        ax.set_xlabel("Session length (min)")
     handles = [Line2D([], [], color=ANIMAL[p], marker="o", ms=4.5, ls="none", label=f"Animal {p}") for p in (2, 3, 4, 5, 6)]
     handles.append(Line2D([], [], color=EXPL, marker="o", mfc="white", ms=4.5, ls="none",
                           label="Animal 1 (exploratory)"))
     handles.append(Patch(color="0.85", label="Mean, as in Chapter 4"))
-    fig.legend(handles=handles, frameon=False, fontsize=7.5, ncol=4, loc="lower center",
+    fig.legend(handles=handles, frameon=False, fontsize=7.8, ncol=4, loc="lower center",
                bbox_to_anchor=(0.5, -0.01), handlelength=1.6, columnspacing=1.0)
     fig.subplots_adjust(left=0.09, right=0.99, top=0.95, bottom=0.14)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -249,8 +232,8 @@ def main():
     record(__file__, [png, out_csv], [SRC / n for n in ORIGINS],
            origins={f"figures/discussion/sources/{n}": str(p) for n, p in ORIGINS.items()},
            notes=("Chapter 5 synthesis figure. Cooling = fall from the start of cooling (dT): ex vivo over the "
-                  "20-min record (minutes 16-20), perfused model from its own start (ring at 25 C) to 35 min, bath "
-                  "model as in the replica comparison. Animal 1 exploratory (grey, hollow). UPDATE-PIGS56."),
+                  "20-min record (minutes 16-20), perfused model from its own start (ring at 25 C) to 35 min; the bath "
+                  "model is not shown (2026-11-11). Panel D axes relabelled. Animal 1 exploratory (grey, hollow). UPDATE-PIGS56."),
            manifest=OUT / "MANIFEST.json")
 
 

@@ -48,7 +48,9 @@ RES_NOTE, RES_LOG = "BENCH_20260831_0901_SAF14_AND_H20_ON_A_RESISTOR.md", "bench
 SET_POINT_C = 4.0
 C_T, C_I, C_V = "#1f77b4", "#444444", "#d62728"      # ring (as in the other figures), current, voltage
 
-plt.rcParams.update({"font.size": 9, "axes.spines.top": False, "axes.spines.right": False})
+# 2026-11-11: drawn at the printed width (6.0 in = textwidth, incl. the tight-bbox pad) so the smallest text prints at 7 pt
+# (was 9.6 in wide at font 9/8, i.e. 4.9-6.2 pt in print).
+plt.rcParams.update({"font.size": 7.5, "xtick.labelsize": 7, "ytick.labelsize": 7, "axes.spines.top": False, "axes.spines.right": False})
 
 
 def soak():
@@ -111,18 +113,18 @@ def main():
             shutil.copy2(EVIDENCE / name, BENCH / name)
     s, st, oc, rs = soak(), staircase(), open_circuit(), resistor_staircase()
 
-    fig = plt.figure(figsize=(9.6, 3.9), constrained_layout=True)
-    gs = fig.add_gridspec(2, 3, width_ratios=[1.45, 1.0, 1.05], height_ratios=[1.35, 1.0])
+    fig = plt.figure(figsize=(5.85, 3.0), constrained_layout=True)
+    gs = fig.add_gridspec(2, 3, width_ratios=[1.4, 1.0, 1.1], height_ratios=[1.35, 1.0])
 
     # (A) regulation and hold
     ax = fig.add_subplot(gs[0, 0])
     t = s["t_s"] / 60
     ax.axhline(SET_POINT_C, color="0.6", lw=0.8, ls="--")
     ax.plot(t, s["Tscr_C"], color=C_T, lw=1.2)
-    ax.text(t.max(), SET_POINT_C + 1.2, "set point 4 °C", ha="right", va="bottom", fontsize=8, color="0.35")
+    ax.text(t.max(), SET_POINT_C + 1.2, "set point 4 °C", ha="right", va="bottom", fontsize=7, color="0.35")
     ax.set_ylabel("Ring temperature (°C)")
     ax.set_ylim(0, 33)
-    ax.set_title("(A) Pull-down and hold", fontsize=10, loc="left")
+    ax.set_title("(A) Pull-down and hold", fontsize=8, loc="left")
     ax.tick_params(labelbottom=False)
     ax2 = fig.add_subplot(gs[1, 0], sharex=ax)
     ax2.plot(t, s["I_A"], color=C_I, lw=1.0)
@@ -137,32 +139,33 @@ def main():
     ax.plot([lo, hi], [lo, hi], color="0.6", lw=0.8, ls="--", label="identity")
     # 2026-10-07: only the final comparison is drawn (31 August, resistor, refitted constants);
     # the six points of 24 August with the module are still read and printed below for the record.
-    ax.plot(rs[:, 0], rs[:, 1], "o", ms=5, mfc="white", mec=C_I, mew=1.3, label="settled point")
+    ax.plot(rs[:, 0], rs[:, 1], "o", ms=3.5, mfc="white", mec=C_I, mew=1.0, label="settled point")
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
     ax.set_aspect("equal")
     ax.set_xlabel("Multimeter in series (A)")
     ax.set_ylabel("Board current monitor (A)")
-    ax.set_title("(B) Current monitor", fontsize=10, loc="left")
-    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    ax.set_title("(B) Current monitor", fontsize=8, loc="left")
+    ax.legend(frameon=False, fontsize=7, loc="lower right", handlelength=1.6, borderaxespad=0.2)
 
     # (C) open-circuit cutout
     t_trip = oc[-1, 0]
     ax = fig.add_subplot(gs[0, 2])
     ax.plot(oc[:, 0], oc[:, 2], color=C_V, lw=1.2)
     ax.axvline(t_trip, color="k", lw=0.9)
-    ax.text(t_trip - 0.15, 0.03, "cutout, %.1f s" % t_trip, rotation=90, ha="right", va="bottom", fontsize=8,
+    ax.text(t_trip - 0.15, 0.03, "cutout, %.1f s" % t_trip, rotation=90, ha="right", va="bottom", fontsize=7,
             transform=ax.get_xaxis_transform())
     ax.set_ylabel("Module voltage (V)")
-    ax.set_title("(C) Module disconnected", fontsize=10, loc="left")
+    ax.set_title("(C) Module disconnected", fontsize=8, loc="left")
     ax.tick_params(labelbottom=False)
     ax2 = fig.add_subplot(gs[1, 2], sharex=ax)
     ax2.plot(oc[:, 0], oc[:, 1], color=C_I, lw=1.0)
     ax2.axvline(t_trip, color="k", lw=0.9)
     ax2.set_ylabel("Current (A)")
-    ax2.set_xlabel("Time after the drive was applied (s)")
+    ax2.set_xlabel("Time after the drive was applied (s)", loc="right")   # wider than the axis at 6 in
     ax2.set_ylim(-0.6, 4.4)
     ax2.set_xlim(0, 10)
+    ax2.set_xticks(range(0, 11, 2))
 
     out = FIG / "board-bench.png"
     fig.savefig(out, dpi=300, bbox_inches="tight", facecolor="white")
