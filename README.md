@@ -27,9 +27,23 @@ from STEP files).
 
 ## Data
 
-The raw recordings (ex-vivo thermistor files, in-vivo session folders) and the COMSOL model files are not in
-this repository; they are available from the author on request. Paths to them are set at the top of each
-script or through environment variables named there.
+This repository holds the code, the dissertation and its figures, and the instructions to run them. **It holds no
+data.** The data are available from the author on request: please open an issue on this repository, saying what you
+need and what for.
+
+Two packages can be provided:
+
+- **Processed data** (about 2.6 GB, most of it the micro-CT segmentation outputs). The inputs each script reads below the raw-data level: the per-eye micro-CT
+  measurements (`code/ch2-exvivo-analysis/config/vitreous_depth_ct.csv`, `vitreous_position_ct.csv`), the reference
+  results the tests compare against (`code/*/tests/reference/`), the stored inputs of every figure and table
+  (`figures/<chapter>/sources/`), and the results of the ex-vivo analysis. The package unpacks over this repository,
+  so that every figure, table and number of the dissertation can be regenerated with the code here.
+- **Raw data**. The ex-vivo thermistor recordings, the micro-CT scans, the in-vivo session folders (temperature and
+  ERG recordings, photographs) and the COMSOL model files. Paths to them are set at the top of each script or through
+  environment variables named there.
+
+Without the processed data the tests in `code/*/tests/` and the figure scripts cannot run: they stop at the first
+input file they cannot find.
 
 ## Licence
 
