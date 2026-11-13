@@ -27,6 +27,7 @@ import pandas as pd
 from scipy import stats
 
 from provenance import THESIS, record
+from table_centring import centre   # 2026-11-12: header rows and first column centred
 
 FIG3 = THESIS / "figures" / "aim3"
 EFF = FIG3 / "sources" / "erg" / "erg_cohort_effects.csv"
@@ -62,13 +63,13 @@ MEAS = ["b_t", "b_amp", "b_width", "b_peaks", "a_t", "a_amp", "op_amp"]
 COMPS = {"Cooling": "cooling", "Jet restoration": "recovery", "RM restoration": "session", "Rewarming": "rewarming"}
 
 
-def stat(x):
+def stat(x, level=0.95):
     x = pd.Series(x, dtype=float).dropna()
     n = len(x)
     if n < 2:
         return dict(n=n, mean=x.mean() if n else np.nan, sd=np.nan, lo=np.nan, hi=np.nan, p=np.nan)
     m, s = x.mean(), x.std(ddof=1)
-    h = stats.t.ppf(0.975, n - 1) * s / np.sqrt(n)
+    h = stats.t.ppf(0.5 + level / 2, n - 1) * s / np.sqrt(n)
     p = stats.ttest_1samp(x, 0).pvalue if s > 0 else np.nan
     return dict(n=n, mean=m, sd=s, lo=m - h, hi=m + h, p=p)
 
@@ -138,7 +139,7 @@ def effects_table(d, iop, summ):
     pressure). The CI is given on the test-against-control difference with the ring at about 9.5 C; the ring-about-4-C
     rows (one or two sessions) give the means only. p_Holm only for the primary measures at about 9.5 C."""
     head = "% Written by code/figures/aim3_erg_intraeye.py; do not edit."
-    colspec = "L{2.4cm}R{0.8cm}L{1.8cm}L{1.8cm}L{3.8cm}R{1.0cm}R{0.9cm}"   # 2026-11-08: g column added; 2026-11-12: Min column 0.8 cm (bold "Min" ran into the next header)
+    colspec = "L{3.9cm}R{0.8cm}L{1.5cm}L{1.5cm}L{2.9cm}R{1.0cm}R{0.9cm}"   # 2026-11-12: first column 3.6 cm so each measure fits on one line; 2026-11-08: g column added; 2026-11-12: Min column 0.8 cm (bold "Min" ran into the next header)
     th = ("\\textbf{Measure} & \\textbf{Min} & \\textbf{Test eye} & \\textbf{Control eye} & "
           "\\textbf{Test against control} & \\textit{p}\\textsubscript{Holm} & \\textit{g} \\\\")
     # 2026-11-08: one block, both ring temperatures together (animals 2-6); the ring-level split stays in
@@ -155,20 +156,20 @@ def effects_table(d, iop, summ):
                            + f" & {pv} & {gval(summ, m, dur, fl)} \\\\")
         return out
 
-    def table(measures, with_p, extra=None):
-        L = [head, f"\\begin{{tabular}}{{{colspec}}}", "\\hline", th, "\\hline"]
+    def table(measures, with_p, extra=None, cs=colspec, hd=th, ncol=7):
+        L = [head, f"\\begin{{tabular}}{{{cs}}}", "\\hline", hd, "\\hline"]
         for k, (st, title, durs) in enumerate(sections):
             if k:
                 L.append("\\hline")
             if title:
-                L.append(f"\\multicolumn{{7}}{{l}}{{\\emph{{{title}}}}} \\\\")
+                L.append(f"\\multicolumn{{{ncol}}}{{l}}{{\\emph{{{title}}}}} \\\\")
             L += erg_rows(st, durs, measures, with_p)
             if extra:
                 L += extra(st, durs)
         return "\n".join(L + ["\\hline", "\\end{tabular}"]) + "\n"
 
     prim = lambda fl: [("b_t", fl, "Implicit time (ms)"), ("b_amp", fl, "Amplitude ($\\mu$V)"),
-                       ("op_amp", fl, "Oscillatory potentials ($\\mu$V)")]
+                       ("op_amp", fl, "Summed OPs ($\\mu$V)")]   # 2026-11-12: as in the between-sessions table; one line
 
     cold_iop = (iop.Pig == 6) | ((iop.Pig == 5) & iop.Session.str.contains("Session [2-3]"))
 
@@ -189,6 +190,8 @@ def effects_table(d, iop, summ):
                 run = max(run, min(1.0, (len(ps) - i) * ps[d]))
                 ph[d] = run
         for k, dur in enumerate(durs):
+            # 2026-11-12: 95% interval in parentheses, as in the ERG tables (a separate 90% column was tried
+            # the same day and dropped)
             cs = []
             for col in ("dTest", "dControl", "Test_minus_Control"):
                 x = stat(g[g.Duration_min == dur][col])
@@ -197,7 +200,7 @@ def effects_table(d, iop, summ):
             x = g[g.Duration_min == dur].Test_minus_Control.astype(float).dropna()
             n = len(x)
             gi = x.mean() / x.std(ddof=1) * (1 - 3 / (4 * (n - 1) - 1)) if n > 2 and x.std(ddof=1) > 0 else np.nan
-            out.append(f"{'Intraocular pressure (mmHg)' if k == 0 else ''} & {dur} & " + " & ".join(cs)
+            out.append(f"{'Intraocular pressure' if k == 0 else ''} & {dur} & " + " & ".join(cs)
                        + f" & {pcell(ph[dur]) if dur in ph else ''} & {sg(gi, 2) if np.isfinite(gi) else ''} \\\\")
         return out
 
@@ -206,7 +209,8 @@ def effects_table(d, iop, summ):
     width = lambda fl: [("b_width", fl, "Width at 80\\% (ms)")]
     t25 = table(prim(25) + width(25), True)
     t8 = table(prim(8) + width(8), True)
-    sec = table([], True, iop_rows)
+    # same columns as the ERG tables; the difference column wider so the interval stays on one line
+    sec = table([], True, iop_rows, cs="L{3.6cm}R{0.8cm}L{1.5cm}L{1.5cm}L{3.4cm}R{1.0cm}R{0.9cm}")
     return t25, t8, sec
 
 
@@ -270,10 +274,10 @@ def main():
     summ = pd.read_csv(SUMM)
     t1b, t1c = FIG3 / "erg-effects-8-table.tex", FIG3 / "erg-effects-secondary-table.tex"
     e1, e2, e3 = effects_table(d, iop, summ)
-    t1.write_text(e1, encoding="utf-8")
-    t1b.write_text(e2, encoding="utf-8")
-    t1c.write_text(e3, encoding="utf-8")
-    t2.write_text(power_table(p), encoding="utf-8")
+    t1.write_text(centre(e1), encoding="utf-8")
+    t1b.write_text(centre(e2), encoding="utf-8")
+    t1c.write_text(centre(e3), encoding="utf-8")
+    t2.write_text(centre(power_table(p)), encoding="utf-8")
     print(pd.DataFrame(pw).round(2).to_string(index=False))
     record(__file__, [o1, o2, t1, t1b, t1c, t2], [EFF, IOP, SUMM], origins={"figures/aim3/sources/erg/erg_cohort_effects.csv": "aim3_erg_figures.py --refresh"},
            notes="Within-eye changes and power by ring group.", manifest=FIG3 / "MANIFEST.json")

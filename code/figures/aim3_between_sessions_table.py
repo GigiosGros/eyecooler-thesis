@@ -17,6 +17,7 @@ import pandas as pd
 from scipy import stats
 
 from provenance import THESIS, record
+from table_centring import centre   # 2026-11-12: header rows and first column centred
 
 FIG3 = THESIS / "figures" / "aim3"
 SRC = FIG3 / "sources" / "erg" / "erg_cohort_between_sessions.csv"
@@ -67,11 +68,11 @@ def main():
         pc = "" if not np.isfinite(pmin) else f"{pmin:.2f}"
         body.append(f"{lab} & {fl:g} & " + " & ".join(cells) + f" & {pc} \\\\")
     L = ["% Written by code/figures/aim3_between_sessions_table.py; do not edit.",
-         "\\begin{tabular}{L{2.4cm}R{0.9cm}L{3.0cm}L{3.0cm}L{3.1cm}R{1.1cm}}", "\\hline",
+         "\\begin{tabular}{L{3.0cm}R{0.9cm}L{2.9cm}L{2.9cm}L{2.9cm}R{1.1cm}}", "\\hline",
          "\\textbf{Measure} & \\textbf{Flash} & " + " & ".join(f"\\textbf{{{lab}}}\\newline (\\textit{{n}} = {ns[s]})" for s, lab in SESSIONS)
          + " & \\textit{p}\\textsubscript{Holm} \\\\", "\\hline"]
     L += body + ["\\hline", "\\end{tabular}"]
-    OUT.write_text("\n".join(L) + "\n", encoding="utf-8")
+    OUT.write_text(centre("\n".join(L) + "\n"), encoding="utf-8")
     print("\n".join(L))
     record(__file__, [OUT], [SRC], notes="Between sessions: change from session 1, test minus control, 90 % CI, Holm p.",
            manifest=FIG3 / "MANIFEST.json")
