@@ -10,6 +10,7 @@ not in the files. Originals are copied unchanged to figures/aim3/sources/thermal
 Output: figures/aim3/thermal-pupil.png
 Run:  python code/figures/aim3_thermal_pupil.py
 """
+import re
 import shutil
 
 import matplotlib
@@ -28,7 +29,7 @@ CHOSEN = [
     ("A", STUDY / "Pig 6" / "Session 1 - 30min" / "09 - Thermal Imaging"
      / "Pig 6 S1 thermal (export 2026-10-27, capture times not in the files)" / "20261027_160724293_iOS.jpg"),
     ("B", STUDY / "Pig 4" / "Session 3 - 2hr" / "09 - Thermal Imaging"
-     / "Pig4_AOT00000308-261013_S3-2hr_Thermal_110452-658_LM_261020.jpg"),
+     / "Pig4_*-261013_S3-2hr_Thermal_110452-658_LM_261020.jpg"),
     ("C", STUDY / "Pig 5" / "Reference" / "Pig 5 ERG Original Files" / "RETeval exports (pupil video, images)"
      / "261026-1_160101_261026081306-RightEye-1.png"),
 ]
@@ -39,9 +40,14 @@ def main():
     SRC.mkdir(parents=True, exist_ok=True)
     srcs, imgs = [], []
     for _, p in CHOSEN:
-        dst = SRC / p.name
+        # Study file names may carry the supplier's animal code; the local copy is
+        # named with the thesis animal label (Pig<N>_A<N>-...) instead.
+        m = re.match(r"Pig(\d+)_[^-]+-", p.name)
+        local = f"Pig{m.group(1)}_A{m.group(1)}-" + p.name[m.end():] if m else p.name
+        dst = SRC / local
         if not dst.exists():
-            shutil.copy2(p, dst)
+            src = p if "*" not in p.name else next(p.parent.glob(p.name))
+            shutil.copy2(src, dst)
         srcs.append(dst)
         imgs.append(np.asarray(Image.open(dst).convert("RGB")))
     fig, axs = plt.subplots(1, 3, figsize=(6.3, 3.0), dpi=400,

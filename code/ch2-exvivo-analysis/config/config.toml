@@ -133,7 +133,7 @@ two later runs on this eye (Ex_E9_C, Ex_E9_LB). Effect of excluding it: human an
 [[qc.manual_exclusions]]
 run_id = "P_Preserved_E3_A"
 channel = "Anterior Sclera"
-reason = """Trace shape: a step near 2.5 min, then re-warming near 16 min and an uneven, non-smooth fall, unlike the other preserved eyes. Identified on visual inspection and excluded in the original 2023 analysis ('Average without broken channels' sheet, Analysis preserved 11-15 YN.xlsx). Decision 2026-09-30, confirmed 2026-10-03. Sensitivity (to be reported): with the trace included, preserved anterior dT is 24.1 (SD 2.0, n = 5) instead of 24.9 (0.9, n = 4), and human original-ring minus preserved goes from -3.66 C (Holm p 0.032) to -2.82 C (Holm p 0.23); no other comparison changes its verdict."""
+reason = """Trace shape: a step near 2.5 min, then re-warming near 16 min and an uneven, non-smooth fall, unlike the other preserved eyes. Identified on visual inspection and excluded in the original 2023 analysis ('Average without broken channels' sheet, Analysis preserved 11-15 XX.xlsx). Decision 2026-09-30, confirmed 2026-10-03. Sensitivity (to be reported): with the trace included, preserved anterior dT is 24.1 (SD 2.0, n = 5) instead of 24.9 (0.9, n = 4), and human original-ring minus preserved goes from -3.66 C (Holm p 0.032) to -2.82 C (Holm p 0.23); no other comparison changes its verdict."""
 
 [[qc.manual_exclusions]]
 run_id = "H_Fresh_E4_A"

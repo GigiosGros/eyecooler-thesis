@@ -1,7 +1,7 @@
 """Figure E.1 (figures/appendix/dsc_coolants.png): differential scanning calorimetry of the
 candidate coolants (distilled water, 50 % propylene glycol, propylene glycol), 10 C/min ramp.
 
-Inputs: the TA TRIOS exports of the 2024-08-08 runs (Lynch laboratory, operator CP),
+Inputs: the TA TRIOS exports of the 2024-08-08 runs (collaborating laboratory),
 `03 - Experiments & Data/Bench Data & Working Notes/Thermal Conductivity DSC/{Distilled water,50%,PG}.xls`,
 copied to figures/appendix/sources/dsc/ and hashed in figures/appendix/MANIFEST.json.
 (A) normalized heat flow against temperature (endothermic down), from 4 C, after the
