@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from provenance import THESIS, record
+from table_centring import centre   # 2026-11-12: header rows and first column centred
 
 FIG3 = THESIS / "figures" / "aim3"
 SRC = FIG3 / "sources" / "master_scores.csv"
@@ -58,7 +59,7 @@ def main():
          "\\multicolumn{2}{l}{\\textbf{Corneal staining}} \\\\",
          "\\textbf{Session} & & \\textit{n} & Test & Control & Test & Control & Test & Control \\\\", "\\hline"]
     L += rows + ["\\hline", "\\end{tabular}"]
-    OUT.write_text("\n".join(L) + "\n", encoding="utf-8")
+    OUT.write_text(centre("\n".join(L) + "\n"), encoding="utf-8")
     print("\n".join(L))
     record(__file__, [OUT], [SRC], notes="Ocular surface grades, median (range), animals 2-6, by session.",
            manifest=FIG3 / "MANIFEST.json")
