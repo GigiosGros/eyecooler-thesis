@@ -5,7 +5,7 @@ Three pictures on the section of the model geometry in its plane of symmetry (y 
   sensor-locations.png           the sensors implanted in the nine human donor eyes
   probe-vs-sensor-locations.png  both, for comparison
 
-Geometry  Computational model/Projects/SCR/Eye Refined v1 LM 250911 v25.step, the file
+Geometry  Computational model/Projects/SCR/Eye Refined v1 250911 v25.step, the file
           imported by the model (dimensions in mm; optical axis along z, corneal apex
           near z = 0). A copy is kept in figures/aim2/sources/cad/.
 Probes    Coordinates of the Domain Point Probes of the v1 parametric-sweep model, read
@@ -56,9 +56,18 @@ from matplotlib.lines import Line2D
 from provenance import FIG, SOURCES, THESIS, record
 
 BOX = THESIS.parents[2]
-ORIGIN = (BOX / "03 - Experiments & Data" / "Computational model" / "Projects" / "SCR"
-          / "Eye Refined v1 LM 250911 v25.step")
-SNAP = SOURCES / "cad" / "Eye Refined v1 LM 250911 v25.step"
+CAD_NAME = "Eye Refined v1 250911 v25.step"
+CAD_GLOB = "Eye Refined v1*250911 v25.step"   # older copies carry extra text in the name
+
+
+def _cad_file(folder):
+    """The model's STEP file in `folder` (matched by pattern), or `folder`/CAD_NAME if none is there."""
+    hits = sorted(folder.glob(CAD_GLOB)) if folder.is_dir() else []
+    return hits[0] if hits else folder / CAD_NAME
+
+
+ORIGIN = _cad_file(BOX / "03 - Experiments & Data" / "Computational model" / "Projects" / "SCR")
+SNAP = _cad_file(SOURCES / "cad")
 PICKS_ORIGIN = (BOX / "03 - Experiments & Data" / "Ex-Vivo" / "CT Segmentation" / "outputs"
                 / "sensor_picks_in_eye_frame.csv")
 PICKS = SOURCES / "data" / "sensor_picks_in_eye_frame.csv"
