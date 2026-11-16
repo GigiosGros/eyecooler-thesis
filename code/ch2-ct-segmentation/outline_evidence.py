@@ -64,11 +64,11 @@ def one(od, sid, out_dir):
     if star:
         h.append(L2(color="cyan", lw=0, marker=".", ms=8, label="globe outline, bridged (no usable edge: metal streak, bubble, holder or nerve contact)"))
     if surf is not None and (surf["measured"] == 2).any():
-        h.append(L2(color="magenta", lw=0, marker=".", ms=8, label="globe outline, set by LM's drawn corrections"))
+        h.append(L2(color="magenta", lw=0, marker=".", ms=8, label="globe outline, set by hand-drawn corrections"))
     fig.legend(handles=h, loc="lower center", ncol=3, fontsize=10, frameon=False)
     gs = r["segmentation"].get("globe_surface", {})
     mf = f" | {100 * gs['measured_fraction']:.0f} % of the outline on a tissue edge" if "measured_fraction" in gs and star else ""
-    mf += f" | {100 * gs['marked_fraction']:.0f} % set by LM's corrections" if gs.get("marked_fraction") else ""
+    mf += f" | {100 * gs['marked_fraction']:.0f} % set by hand-drawn corrections" if gs.get("marked_fraction") else ""
     fig.suptitle(f"{sid} ({r['group']}, {r['bath']} scan): globe outline on the scan | {r['globe_vol_mL']} mL | axial "
                  f"{r['anatomy']['axial_length_mm']} mm (axis from {r['anatomy']['axis']['source']}){mf}", fontsize=12)
     plt.tight_layout(rect=[0, 0.03, 1, 0.96]); p = f"{out_dir}/{sid}_outline.png"; plt.savefig(p, dpi=75); plt.close()

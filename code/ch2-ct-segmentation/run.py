@@ -47,7 +47,7 @@ def process(sid, refresh=False):
         v, s, s0, raw_max = io.load_downsampled(src, f)
         np.savez_compressed(cache, v=v, s=s, s0=s0, raw_max=raw_max)
     scan["marks"] = {}                                         # corrections drawn by hand, by round (outline_marks.py)
-    for k, mf in [(1, f"{sid}_outline_marks_LM.csv")] + [(k, f"{sid}_outline_marks_LM_round{k}.csv") for k in range(2, 10)]:
+    for k, mf in [(1, f"{sid}_outline_marks.csv")] + [(k, f"{sid}_outline_marks_round{k}.csv") for k in range(2, 10)]:
         if os.path.exists(os.path.join(od, mf)):
             mk = np.loadtxt(os.path.join(od, mf), delimiter=",", comments="#", skiprows=3, ndmin=2)
             scan["marks"][k] = np.c_[mk[:, :3], mk[:, 8], 5 * mk[:, 6] + mk[:, 7]]      # point, kind, section number

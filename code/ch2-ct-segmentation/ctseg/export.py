@@ -130,7 +130,7 @@ def qc(path, sid, v, lab, gl, s, f, s0, anat, beads, info, surf=None):
         top.append(L(color="cyan", lw=0, marker=".", ms=7,
                      label="globe outline, bridged (no usable edge: metal streak, bubble, holder or nerve contact)"))
     if surf is not None and (surf["measured"] == 2).any():
-        top.append(L(color="magenta", lw=0, marker=".", ms=7, label="globe outline, set by LM's drawn corrections"))
+        top.append(L(color="magenta", lw=0, marker=".", ms=7, label="globe outline, set by hand-drawn corrections"))
     top.append(L(color="y", lw=1.2, marker=">", ms=7, label="axis of the eye frame (arrow = anterior end)"))
     if beads:
         top.append(L(color="lime", lw=0, marker="o", mfc="none", ms=7, label="thermistor bead (projected onto the plane)"))
@@ -146,7 +146,7 @@ def qc(path, sid, v, lab, gl, s, f, s0, anat, beads, info, surf=None):
     if "measured_fraction" in gs:
         mk = gs.get("marked_fraction", 0.0)
         outline = (f" | outline {100 * gs['measured_fraction']:.0f} % edge, {100 * (1 - gs['measured_fraction'] - mk):.0f} % bridged"
-                   + (f", {100 * mk:.0f} % LM marks" if mk else ""))
+                   + (f", {100 * mk:.0f} % manual marks" if mk else ""))
     fig.suptitle(f"{sid}: globe {info['globe_vol_mL']} mL | axial {anat['axial_length_mm']} mm (axis from {anat['axis']['source']}) | "
                  f"equatorial {anat['equatorial']['max_mm']}/{anat['equatorial']['min_mm']} mm | beads {len(beads)}{outline}",
                  fontsize=10)

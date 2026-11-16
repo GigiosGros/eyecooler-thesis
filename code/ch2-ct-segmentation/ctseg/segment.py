@@ -12,7 +12,7 @@ Globe outline (params.globe_surface.method):
                  edges found along radial rays (see star_surface). Used for fresh and human eyes.
   "opening"      legacy: 3 mm morphological opening of the solid mask. Always used for the collapsed
                  preserved eyes (shell: true), whose real dents a smooth surface would bridge.
-Corrections drawn by hand on the outline-evidence pictures (<ID>_outline_marks_LM.csv, see outline_marks.py) are
+Corrections drawn by hand on the outline-evidence pictures (<ID>_outline_marks.csv, see outline_marks.py) are
 applied on top of either outline (apply_marks): the surface is moved onto the marked points and left as it is
 away from them. For an opening-based outline the mask is first written as r(direction) (mask_to_star).
 """

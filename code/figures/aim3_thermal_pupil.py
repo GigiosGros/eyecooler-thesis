@@ -29,7 +29,7 @@ CHOSEN = [
     ("A", STUDY / "Pig 6" / "Session 1 - 30min" / "09 - Thermal Imaging"
      / "Pig 6 S1 thermal (export 2026-10-27, capture times not in the files)" / "20261027_160724293_iOS.jpg"),
     ("B", STUDY / "Pig 4" / "Session 3 - 2hr" / "09 - Thermal Imaging"
-     / "Pig4_*-261013_S3-2hr_Thermal_110452-658_LM_261020.jpg"),
+     / "Pig4_*-261013_S3-2hr_Thermal_110452-658_*261020.jpg"),
     ("C", STUDY / "Pig 5" / "Reference" / "Pig 5 ERG Original Files" / "RETeval exports (pupil video, images)"
      / "261026-1_160101_261026081306-RightEye-1.png"),
 ]
@@ -44,6 +44,7 @@ def main():
         # named with the thesis animal label (Pig<N>_A<N>-...) instead.
         m = re.match(r"Pig(\d+)_[^-]+-", p.name)
         local = f"Pig{m.group(1)}_A{m.group(1)}-" + p.name[m.end():] if m else p.name
+        local = local.replace("_*", "_")   # initials in the study file name are matched by the pattern, not copied
         dst = SRC / local
         if not dst.exists():
             src = p if "*" not in p.name else next(p.parent.glob(p.name))

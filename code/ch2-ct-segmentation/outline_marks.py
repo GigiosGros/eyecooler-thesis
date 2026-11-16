@@ -1,9 +1,9 @@
 """Read the corrections drawn by hand on the outline-evidence pictures and store them as 3-D points.
 
 On 2026-10-06 I drew, in magenta, where the true globe wall runs on outputs/_outline_evidence/<ID>_outline.png.
-The annotated pictures are kept in outputs/_outline_evidence_LM_marks_20261006/. Every picture is 15 known
+The annotated pictures are kept in outputs/_outline_evidence_manual_marks_20261006/. Every picture is 15 known
 sections of the eye frame that was current when it was drawn, so a magenta pixel is a point in the scan.
-This script writes outputs/<ID>/<ID>_outline_marks_LM.csv (working-grid mm and Slicer LPS mm); run.py then makes
+This script writes outputs/<ID>/<ID>_outline_marks.csv (working-grid mm and Slicer LPS mm); run.py then makes
 the globe outline pass through those points (segment.apply_marks).
 
 The frame the pictures were drawn in is written into the csv header the first time and read back from there
@@ -14,7 +14,7 @@ them a correction spreads sideways into wall already accepted.
 
     python outline_marks.py            # all annotated pictures of round 1
     python outline_marks.py H7 P12
-    python outline_marks.py --round=2  # second round (green lines of 2026-10-07) -> <ID>_outline_marks_LM_round2.csv
+    python outline_marks.py --round=2  # second round (green lines of 2026-10-07) -> <ID>_outline_marks_round2.csv
 
 Check printed per eye: the red outline pixels of the same picture, sent through the same pixel -> mm mapping,
 must fall on the stored outline (median |error| well under one pixel = 0.13 mm).
@@ -31,13 +31,13 @@ import run
 from ctseg import segment
 from outline_evidence import OFFSETS
 
-MARKS_DIR = "_outline_evidence_LM_marks_20261006"
+MARKS_DIR = "_outline_evidence_manual_marks_20261006"
 # Later rounds: drawn again (any colour) on the pictures of the CORRECTED outline. The untouched pictures and the
 # frame each was drawn in were saved first, so the drawing is whatever differs from the untouched picture.
 # Round 3 was drawn before untouched copies were made: its marks are the orange pixels (255, 127, 39), a colour the
 # pictures do not otherwise contain; the frames were saved into the annotated folder right after.
-ROUNDS = {2: dict(marks_dir="_outline_evidence_LM_marks_round2_20261007", pristine_dir="_outline_evidence_round2_pristine"),
-          3: dict(marks_dir="_outline_evidence_LM_marks_round3_20261007", colour="orange")}
+ROUNDS = {2: dict(marks_dir="_outline_evidence_manual_marks_round2_20261007", pristine_dir="_outline_evidence_round2_pristine"),
+          3: dict(marks_dir="_outline_evidence_manual_marks_round3_20261007", colour="orange")}
 EDGE = 1.0      # px: the one-pixel axes frame at each side of a section (gives the smallest error in the mapping check)
 KEEP_CLEAR_DEG = 3   # an outline pixel within this angle of a magenta pixel (seen from the section's outline centre) is replaced
 KEEP_STEP = 3        # every 3rd untouched outline pixel becomes a keep anchor
@@ -104,7 +104,7 @@ def one(od, sid):
     outline = red | ((r < 80) & (g > 200) & (b > 200))       # red or cyan part of the outline as it was drawn
     res = json.load(open(f"{od}/{sid}/{sid}_results.json")); s, s0, f = res["voxel_work_mm"], res["voxel_full_mm"], res["downsample"]
     o = np.array(res["anatomy"]["frame"]["origin_mm"]); F = np.array(res["anatomy"]["frame"]["axes"])
-    out = f"{od}/{sid}/{sid}_outline_marks_LM.csv"; frame_from = "results.json"
+    out = f"{od}/{sid}/{sid}_outline_marks.csv"; frame_from = "results.json"
     if os.path.exists(out):                                  # the frame the pictures were drawn in, as first recorded
         nums = [float(x) for x in re.findall(r"-?\d+\.\d+(?:e-?\d+)?|-?\d+", open(out).readlines()[1].split("origin_mm")[1])]
         o, F = np.array(nums[:3]), np.array(nums[3:12]).reshape(3, 3); frame_from = "the existing csv"
@@ -123,8 +123,8 @@ def one(od, sid):
     if len(P):
         A = np.r_[np.c_[P, np.ones(len(P))], np.c_[K, np.zeros(len(K))]]
         with open(out, "w", newline="") as fh:
-            fh.write(f"# Corrections drawn by LM on {MARKS_DIR}/{sid}_outline.png, read by outline_marks.py. kind 1 = magenta mark (the wall is here); "
-                     f"kind 0 = outline LM left untouched in an annotated section (keep it).\n")
+            fh.write(f"# Corrections drawn by hand on {MARKS_DIR}/{sid}_outline.png, read by outline_marks.py. kind 1 = magenta mark (the wall is here); "
+                     f"kind 0 = outline left untouched in an annotated section (keep it).\n")
             fh.write(f"# Eye frame of the picture: origin_mm {o.round(3).tolist()} axes {F.round(4).tolist()}; working voxel {s} mm.\n")
             w = csv.writer(fh); w.writerow(["work_k_mm", "work_j_mm", "work_i_mm", "L_mm", "P_mm", "S_mm", "section_row", "section_col", "kind"])
             lps = (A[:, :3] + (f - 1) / 2 * s0)[:, ::-1]
@@ -134,7 +134,7 @@ def one(od, sid):
 
 def later_round(od, sid, k):
     """Round k >= 2: marks = pixels that differ from the untouched picture; keep anchors = the outline (red, cyan
-    or magenta) left untouched in a section that was drawn on or looked at. Written to <ID>_outline_marks_LM_round<k>.csv.
+    or magenta) left untouched in a section that was drawn on or looked at. Written to <ID>_outline_marks_round<k>.csv.
     run.py applies the rounds in order, each on the outline the previous one produced."""
     R = ROUNDS[k]; fn = f"{od}/{R['marks_dir']}/{sid}_outline.png"; ref = R.get("pristine_dir", R["marks_dir"])
     pn = f"{od}/{ref}/{sid}_outline.png"
@@ -155,9 +155,9 @@ def later_round(od, sid, k):
     P = pixels_to_points(drawn, box, o, F, s)
     K = pixels_to_points(untouched(outline & ~drawn, drawn, box), box, o, F, s, thin=False, step=KEEP_STEP)
     A = np.r_[np.c_[P, np.ones(len(P))], np.c_[K, np.zeros(len(K))]]
-    with open(f"{od}/{sid}/{sid}_outline_marks_LM_round{k}.csv", "w", newline="") as fh:
-        fh.write(f"# Round {k} corrections drawn by LM on {R['marks_dir']}/{sid}_outline.png ({'pixels that differ from ' + R['pristine_dir'] if 'pristine_dir' in R else R['colour'] + ' pixels'}), "
-                 f"read by outline_marks.py. kind 1 = mark (the wall is here); kind 0 = outline LM left untouched (keep it). "
+    with open(f"{od}/{sid}/{sid}_outline_marks_round{k}.csv", "w", newline="") as fh:
+        fh.write(f"# Round {k} corrections drawn by hand on {R['marks_dir']}/{sid}_outline.png ({'pixels that differ from ' + R['pristine_dir'] if 'pristine_dir' in R else R['colour'] + ' pixels'}), "
+                 f"read by outline_marks.py. kind 1 = mark (the wall is here); kind 0 = outline left untouched (keep it). "
                  f"Applies to the outline as it stood after round {k - 1}.\n")
         fh.write(f"# Eye frame of the picture: origin_mm {o.round(3).tolist()} axes {F.round(4).tolist()}; working voxel {s} mm.\n")
         w = csv.writer(fh); w.writerow(["work_k_mm", "work_j_mm", "work_i_mm", "L_mm", "P_mm", "S_mm", "section_row", "section_col", "kind"])
